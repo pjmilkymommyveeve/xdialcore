@@ -10,7 +10,20 @@ class Call(models.Model):
     number = models.CharField(max_length=20)
     transcription = models.TextField(blank=True, null=True)
     stage = models.IntegerField(blank=True, null=True)
-    response_category = models.TextField(blank=True, null=True)
+    voice = models.ForeignKey(
+        'campaigns.Voice',
+        on_delete=models.SET_NULL,
+        related_name='calls',
+        blank=True,
+        null=True
+    )
+    response_category = models.ForeignKey(
+        'campaigns.ResponseCategory',
+        on_delete=models.SET_NULL,
+        related_name='calls',
+        blank=True,
+        null=True
+    )
     list_id = models.TextField(blank=True, null=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     
@@ -24,6 +37,8 @@ class Call(models.Model):
             models.Index(fields=['timestamp'], name='idx_calls_timestamp'),
             models.Index(fields=['stage'], name='idx_calls_stage'),
             models.Index(fields=['list_id'], name='idx_calls_list_id'),
+            models.Index(fields=['voice'], name='idx_calls_voice'),
+            models.Index(fields=['response_category'], name='idx_calls_response_cat'),
         ]
     
     def __str__(self):

@@ -75,39 +75,26 @@ class Voice(models.Model):
         return self.name
 
 
-class CampaignVoiceStats(models.Model):
-    campaign = models.ForeignKey(
-        Campaign,
-        on_delete=models.CASCADE,
-        related_name='voice_stats'
-    )
-    voice = models.ForeignKey(
-        Voice,
-        on_delete=models.CASCADE,
-        related_name='campaign_stats'
-    )
-    interested_count = models.BigIntegerField(default=0)
+class ResponseCategory(models.Model):
+    name = models.CharField(max_length=255, unique=True)
     
     class Meta:
-        db_table = 'campaign_voice_stats'
-        unique_together = [['campaign', 'voice']]
-        verbose_name = 'Voice Statistics'
-        verbose_name_plural = 'Voice Statistics'
+        db_table = 'response_categories'
+        verbose_name = 'Response Category'
+        verbose_name_plural = 'Response Categories'
         indexes = [
-            models.Index(fields=['campaign'], name='idx_cvs_campaign'),
-            models.Index(fields=['voice'], name='idx_cvs_voice'),
-            models.Index(fields=['interested_count'], name='idx_cvs_int_count'),
+            models.Index(fields=['name'], name='idx_response_categories_name'),
         ]
     
     def __str__(self):
-        return f"{self.campaign.name} - {self.voice.name}"
+        return self.name
 
 
 class CampaignRequirements(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     long_call_scripts_active = models.BooleanField(default=False)
-    disposition_set = models.TextField(blank=True, null=True)
+    disposition_set = models.BooleanField(default=False)
     bot_count = models.IntegerField(blank=True, null=True)
     
     class Meta:

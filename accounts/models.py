@@ -81,3 +81,4 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def is_qa(self):
         return self.role.name == Role.QA
+
