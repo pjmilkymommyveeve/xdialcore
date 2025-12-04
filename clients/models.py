@@ -3,7 +3,6 @@ from accounts.models import User
 
 
 class Client(models.Model):
-    """Client profile linked to user"""
     client = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
@@ -15,6 +14,8 @@ class Client(models.Model):
     
     class Meta:
         db_table = 'clients'
+        verbose_name = 'Client'
+        verbose_name_plural = 'Clients'
         indexes = [
             models.Index(fields=['name'], name='idx_clients_name'),
             models.Index(fields=['is_archived'], name='idx_clients_is_archived'),

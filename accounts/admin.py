@@ -9,6 +9,8 @@ class RoleAdmin(admin.ModelAdmin):
     search_fields = ['name']
     
     def has_module_permission(self, request):
+        if not request.user.is_authenticated:
+            return False
         return request.user.is_superuser or request.user.is_admin
 
 
@@ -33,9 +35,13 @@ class UserAdmin(BaseUserAdmin):
     )
     
     def has_module_permission(self, request):
+        if not request.user.is_authenticated:
+            return False
         return request.user.is_superuser or request.user.is_admin
     
     def has_change_permission(self, request, obj=None):
+        if not request.user.is_authenticated:
+            return False
         if request.user.is_superuser:
             return True
         if request.user.is_admin:

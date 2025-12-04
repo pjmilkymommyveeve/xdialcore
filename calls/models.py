@@ -2,7 +2,6 @@ from django.db import models
 
 
 class Call(models.Model):
-    """Call records"""
     client_campaign_model = models.ForeignKey(
         'campaigns.ClientCampaignModel',
         on_delete=models.CASCADE,
@@ -17,8 +16,10 @@ class Call(models.Model):
     
     class Meta:
         db_table = 'calls'
+        verbose_name = 'Call Record'
+        verbose_name_plural = 'Call Records'
         indexes = [
-            models.Index(fields=['client_campaign_model'], name='idx_calls_client_campaign_model_id'),
+            models.Index(fields=['client_campaign_model'], name='idx_call_ccm'),
             models.Index(fields=['number'], name='idx_calls_number'),
             models.Index(fields=['timestamp'], name='idx_calls_timestamp'),
             models.Index(fields=['stage'], name='idx_calls_stage'),
