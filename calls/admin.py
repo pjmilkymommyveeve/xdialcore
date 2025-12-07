@@ -30,10 +30,10 @@ class CallForm(forms.ModelForm):
 @admin.register(Call)
 class CallAdmin(admin.ModelAdmin):
     form = CallForm
-    list_display = ['id', 'number', 'stage', 'get_voice', 'get_response_category', 'timestamp', 'get_client', 'get_campaign']
-    list_filter = ['stage', 'timestamp', 'voice', 'response_category', 'client_campaign_model__campaign_model__campaign']
+    list_display = ['id', 'number', 'stage', 'get_voice', 'get_response_category', 'transferred', 'timestamp', 'get_client', 'get_campaign']
+    list_filter = ['stage', 'timestamp', 'voice', 'response_category', 'transferred', 'client_campaign_model__campaign_model__campaign']
     search_fields = ['number', 'list_id', 'transcription', 'client_campaign_model__client__name']
-    readonly_fields = ['client_campaign_model', 'number', 'timestamp', 'stage', 'voice', 'response_category', 'list_id', 'transcription']
+    readonly_fields = ['client_campaign_model', 'number', 'timestamp', 'stage', 'voice', 'response_category', 'list_id', 'transferred', 'transcription']
     date_hierarchy = 'timestamp'
     
     # Optimize queries
@@ -50,7 +50,7 @@ class CallAdmin(admin.ModelAdmin):
             'fields': ('client_campaign_model', 'number', 'timestamp')
         }),
         ('Details', {
-            'fields': ('stage', 'voice', 'response_category', 'list_id')
+            'fields': ('stage', 'voice', 'response_category', 'transferred', 'list_id')
         }),
         ('Transcription', {
             'fields': ('transcription',),

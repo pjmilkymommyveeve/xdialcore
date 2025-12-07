@@ -1,6 +1,5 @@
 from django.db import models
 
-
 class Call(models.Model):
     client_campaign_model = models.ForeignKey(
         'campaigns.ClientCampaignModel',
@@ -25,8 +24,9 @@ class Call(models.Model):
         null=True
     )
     list_id = models.TextField(blank=True, null=True)
+    transferred = models.BooleanField(default=False)
     timestamp = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         db_table = 'calls'
         verbose_name = 'Call Record'
@@ -40,6 +40,6 @@ class Call(models.Model):
             models.Index(fields=['voice'], name='idx_calls_voice'),
             models.Index(fields=['response_category'], name='idx_calls_response_cat'),
         ]
-    
+
     def __str__(self):
         return f"Call {self.id} - {self.number}"
