@@ -31,7 +31,6 @@ def login_view(request):
 def logout_view(request):
     """Handle user logout"""
     logout(request)
-    messages.success(request, 'You have been logged out successfully.')
     return redirect('login')
 
 
@@ -41,7 +40,7 @@ def get_landing_redirect(user):
     # Mapping roles to landing page URL names
     role_landing_map = {
         'admin': 'admin_landing',
-        'client': 'client_landing',
+        'client': 'clients:client_landing',
         'onboarding': 'onboarding_landing',
         'qa': 'qa_landing',
     }

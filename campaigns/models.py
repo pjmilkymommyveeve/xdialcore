@@ -77,6 +77,7 @@ class Voice(models.Model):
 
 class ResponseCategory(models.Model):
     name = models.CharField(max_length=255, unique=True)
+    color = models.CharField(max_length=255)
     
     class Meta:
         db_table = 'response_categories'

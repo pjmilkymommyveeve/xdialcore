@@ -1,0 +1,433 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Export - {{ campaign.name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+        .btn-primary { background-color: #3b82f6; color: white; }
+        .btn-primary:hover { background-color: #2563eb; }
+        .btn-primary:disabled { background-color: #9ca3af; cursor: not-allowed; }
+        .btn-outline { background-color: white; color: #374151; border: 1px solid #d1d5db; }
+        .btn-outline:hover { background-color: #f9fafb; }
+        .card {
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        }
+        .card-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .card-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #111827;
+        }
+        .card-content { padding: 1.5rem; }
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 0.5rem;
+        }
+        .form-input, .form-select {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+        }
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .checkbox {
+            width: 1rem;
+            height: 1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.25rem;
+            cursor: pointer;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+        }
+        @media (max-width: 1024px) {
+            .grid-3 { grid-template-columns: 1fr; }
+            .checkbox-group { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 px-6 py-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <svg class="h-6 w-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                </svg>
+                <div>
+                    <p class="text-lg font-medium text-blue-600">{{ client_name }}</p>
+                    <p class="text-sm text-gray-600">{{ campaign.name }} - {{ campaign.model }}</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="{% url 'clients:campaign_dashboard' campaign.id %}" class="inline-flex items-center gap-2 px-4 py-2 border bg-white shadow-sm hover:bg-gray-50 rounded-md text-sm font-medium">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    Dashboard
+                </a>
+                <a href="{% url 'clients:campaign_recordings' campaign.id %}" class="inline-flex items-center gap-2 px-4 py-2 border bg-white shadow-sm hover:bg-gray-50 rounded-md text-sm font-medium">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+                    </svg>
+                    Recordings
+                </a>
+                <a href="{% url 'clients:client_landing' %}" class="inline-flex items-center gap-2 px-4 py-2 hover:bg-gray-100 rounded-md text-sm font-medium">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                    </svg>
+                    Back
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div style="margin-bottom: 1.5rem;">
+            <h1 style="font-size: 1.875rem; font-weight: 700; margin-bottom: 0.5rem;">Data Export</h1>
+            <p style="color: #6b7280;">Export call data in CSV format with advanced filtering options</p>
+        </div>
+
+        <div class="grid-3">
+            <!-- Left Column: Filters -->
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <!-- List ID Filter -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">List ID Selection</h2>
+                    </div>
+                    <div class="card-content">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <label class="form-label" style="margin-bottom: 0;">Select List IDs to export:</label>
+                            <button id="selectAllLists" class="btn btn-outline" style="padding: 0.375rem 0.75rem;">
+                                Select All ({{ list_ids|length }})
+                            </button>
+                        </div>
+                        <div class="checkbox-group" id="listIdsContainer">
+                            {% for list_id in list_ids %}
+                            <div class="checkbox-item">
+                                <input type="checkbox" class="checkbox list-checkbox" id="list-{{ forloop.counter }}" value="{{ list_id }}">
+                                <label for="list-{{ forloop.counter }}" style="font-size: 0.875rem; cursor: pointer;">{{ list_id }}</label>
+                            </div>
+                            {% empty %}
+                            <p style="color: #6b7280; font-size: 0.875rem; grid-column: 1 / -1;">No list IDs available</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Date Range Filter -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Date Range Selection</h2>
+                    </div>
+                    <div class="card-content">
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+                            <div>
+                                <label class="form-label">Start Date</label>
+                                <input type="date" id="startDate" class="form-input">
+                            </div>
+                            <div>
+                                <label class="form-label">Start Time</label>
+                                <input type="time" id="startTime" class="form-input">
+                            </div>
+                            <div>
+                                <label class="form-label">End Date</label>
+                                <input type="date" id="endDate" class="form-input">
+                            </div>
+                            <div>
+                                <label class="form-label">End Time</label>
+                                <input type="time" id="endTime" class="form-input">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Disposition Filter -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Disposition Selection</h2>
+                    </div>
+                    <div class="card-content">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <label class="form-label" style="margin-bottom: 0;">Select dispositions to export:</label>
+                            <button id="selectAllCategories" class="btn btn-outline" style="padding: 0.375rem 0.75rem;">
+                                Select All ({{ all_categories|length }})
+                            </button>
+                        </div>
+                        <div class="checkbox-group" id="categoriesContainer">
+                            {% for category in all_categories %}
+                            <div class="checkbox-item">
+                                <input type="checkbox" class="checkbox category-checkbox" id="cat-{{ category.id }}" value="{{ category.id }}">
+                                <label for="cat-{{ category.id }}" style="font-size: 0.875rem; cursor: pointer;">
+                                    {{ category.name }} ({{ category.count }})
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Summary & Actions -->
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <!-- Summary Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Export Summary</h2>
+                    </div>
+                    <div class="card-content" style="display: flex; flex-direction: column; gap: 1rem;">
+                        <div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span style="font-size: 0.875rem; color: #6b7280;">Total Records:</span>
+                                <span style="font-weight: 500;" id="total-records">0</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="font-size: 0.875rem; color: #6b7280;">Estimated Size:</span>
+                                <span style="font-weight: 500;" id="estimated-size">0 MB</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="card">
+                    <div class="card-content" style="display: flex; flex-direction: column; gap: 1rem; padding-top: 1.5rem;">
+                        <button id="exportBtn" class="btn btn-primary" style="width: 100%; padding: 0.75rem 1.5rem; justify-content: center;">
+                            Export to CSV
+                        </button>
+                        <button id="resetBtn" class="btn btn-outline" style="width: 100%; justify-content: center;">
+                            Reset Filters
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Help Info -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title" style="font-size: 0.875rem;">Export Information</h2>
+                    </div>
+                    <div class="card-content" style="background-color: #f9fafb; font-size: 0.875rem; color: #6b7280;">
+                        <p style="margin-bottom: 0.5rem;">• CSV files include all call details</p>
+                        <p style="margin-bottom: 0.5rem;">• Large exports may take a few moments</p>
+                        <p style="margin-bottom: 0.5rem;">• Files are automatically named with the current date</p>
+                        <p>• Only your call data will be exported</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // State management
+        const state = {
+            selectedLists: new Set(),
+            selectedCategories: new Set(),
+            startDate: '',
+            startTime: '',
+            endDate: '',
+            endTime: ''
+        };
+
+        // Calculate total based on filters (mock calculation)
+        function updateSummary() {
+            const totalCategories = '{{ all_categories|length }}';
+            const totalLists = '{{ list_ids|length }}';
+            
+            let categoryCount = state.selectedCategories.size;
+            let listCount = state.selectedLists.size;
+            
+            if (categoryCount === 0) categoryCount = totalCategories;
+            if (listCount === 0) listCount = totalLists;
+            
+            // Mock calculation - replace with actual backend calculation
+            const estimatedRecords = categoryCount * listCount * 150; // Average 150 records per list/category combo
+            const estimatedSize = (estimatedRecords * 0.5 / 1000).toFixed(2); // ~0.5KB per record
+            
+            document.getElementById('total-records').textContent = estimatedRecords.toLocaleString();
+            document.getElementById('estimated-size').textContent = estimatedSize + ' MB';
+            
+            // Enable/disable export button
+            const exportBtn = document.getElementById('exportBtn');
+            if (estimatedRecords > 0) {
+                exportBtn.disabled = false;
+            } else {
+                exportBtn.disabled = true;
+            }
+        }
+
+        // Select All Lists
+        document.getElementById('selectAllLists').addEventListener('click', function() {
+            const checkboxes = document.querySelectorAll('.list-checkbox');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = !allChecked;
+                if (!allChecked) {
+                    state.selectedLists.add(checkbox.value);
+                } else {
+                    state.selectedLists.delete(checkbox.value);
+                }
+            });
+            
+            updateSummary();
+        });
+
+        // Individual list checkbox change
+        document.querySelectorAll('.list-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    state.selectedLists.add(this.value);
+                } else {
+                    state.selectedLists.delete(this.value);
+                }
+                updateSummary();
+            });
+        });
+
+        // Select All Categories
+        document.getElementById('selectAllCategories').addEventListener('click', function() {
+            const checkboxes = document.querySelectorAll('.category-checkbox');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = !allChecked;
+                if (!allChecked) {
+                    state.selectedCategories.add(checkbox.value);
+                } else {
+                    state.selectedCategories.delete(checkbox.value);
+                }
+            });
+            
+            updateSummary();
+        });
+
+        // Individual category checkbox change
+        document.querySelectorAll('.category-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    state.selectedCategories.add(this.value);
+                } else {
+                    state.selectedCategories.delete(this.value);
+                }
+                updateSummary();
+            });
+        });
+
+        // Date/Time inputs
+        document.getElementById('startDate').addEventListener('change', function() {
+            state.startDate = this.value;
+        });
+        document.getElementById('startTime').addEventListener('change', function() {
+            state.startTime = this.value;
+        });
+        document.getElementById('endDate').addEventListener('change', function() {
+            state.endDate = this.value;
+        });
+        document.getElementById('endTime').addEventListener('change', function() {
+            state.endTime = this.value;
+        });
+
+        // Reset button
+        document.getElementById('resetBtn').addEventListener('click', function() {
+            // Clear all checkboxes
+            document.querySelectorAll('.list-checkbox').forEach(cb => cb.checked = false);
+            document.querySelectorAll('.category-checkbox').forEach(cb => cb.checked = false);
+            
+            // Clear date/time inputs
+            document.getElementById('startDate').value = '';
+            document.getElementById('startTime').value = '';
+            document.getElementById('endDate').value = '';
+            document.getElementById('endTime').value = '';
+            
+            // Reset state
+            state.selectedLists.clear();
+            state.selectedCategories.clear();
+            state.startDate = '';
+            state.startTime = '';
+            state.endDate = '';
+            state.endTime = '';
+            
+            updateSummary();
+        });
+
+        // Export button
+        document.getElementById('exportBtn').addEventListener('click', function() {
+            const exportData = {
+                campaign_id: '{{ campaign.id }}',
+                list_ids: Array.from(state.selectedLists),
+                categories: Array.from(state.selectedCategories),
+                start_date: state.startDate,
+                start_time: state.startTime,
+                end_date: state.endDate,
+                end_time: state.endTime
+            };
+            
+            // Create form and submit
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{% url "clients:data_export" campaign.id %}';
+            
+            // Add CSRF token
+            const csrfToken = '{{ csrf_token }}';
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = csrfToken;
+            form.appendChild(csrfInput);
+            
+            // Add export data
+            const dataInput = document.createElement('input');
+            dataInput.type = 'hidden';
+            dataInput.name = 'export_data';
+            dataInput.value = JSON.stringify(exportData);
+            form.appendChild(dataInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+        });
+
+        // Initialize summary on page load
+        updateSummary();
+    </script>
+</body>
+</html>
