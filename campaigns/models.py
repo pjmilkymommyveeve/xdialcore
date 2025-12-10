@@ -159,12 +159,22 @@ class PrimaryDialer(models.Model):
     verifier_campaign = models.CharField(max_length=255, blank=True, null=True)
     port = models.IntegerField(default=5060)
     
+    # ADD THIS: Link to DialerSettings
+    dialer_settings = models.ForeignKey(
+        'DialerSettings',
+        on_delete=models.CASCADE,
+        related_name='primary_dialers',
+        blank=True,
+        null=True
+    )
+    
     class Meta:
         db_table = 'primary_dialer'
         verbose_name = 'Primary Dialer'
         verbose_name_plural = 'Primary Dialers'
         indexes = [
             models.Index(fields=['port'], name='idx_primary_dialer_port'),
+            models.Index(fields=['dialer_settings'], name='idx_primary_dialer_settings'),
         ]
     
     def __str__(self):
@@ -193,11 +203,9 @@ class CloserDialer(models.Model):
 
 
 class DialerSettings(models.Model):
-    primary_dialer = models.ForeignKey(
-        PrimaryDialer,
-        on_delete=models.RESTRICT,
-        related_name='dialer_settings'
-    )
+    # REMOVE: primary_dialers ManyToManyField
+    # Primary dialers now reference this model via ForeignKey (reverse relation)
+    
     closer_dialer = models.ForeignKey(
         CloserDialer,
         on_delete=models.RESTRICT,
@@ -211,7 +219,6 @@ class DialerSettings(models.Model):
         verbose_name = 'Dialer Settings'
         verbose_name_plural = 'Dialer Settings'
         indexes = [
-            models.Index(fields=['primary_dialer'], name='idx_ds_primary'),
             models.Index(fields=['closer_dialer'], name='idx_ds_closer'),
         ]
     
@@ -244,6 +251,7 @@ class ClientCampaignModel(models.Model):
     current_remote_agents = models.TextField(blank=True, null=True)
     is_active = models.BooleanField(default=False)
     is_enabled = models.BooleanField(default=True)
+    approved = models.BooleanField(default=False)
     dialer_settings = models.ForeignKey(
         DialerSettings,
         on_delete=models.SET_NULL,
@@ -268,6 +276,7 @@ class ClientCampaignModel(models.Model):
             models.Index(fields=['campaign_model'], name='idx_ccm_camp_model'),
             models.Index(fields=['is_active'], name='idx_ccm_active'),
             models.Index(fields=['is_enabled'], name='idx_ccm_enabled'),
+            models.Index(fields=['approved'], name='idx_ccm_approved'),
             models.Index(fields=['start_date'], name='idx_ccm_start'),
             models.Index(fields=['end_date'], name='idx_ccm_end'),
         ]

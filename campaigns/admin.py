@@ -38,6 +38,15 @@ class ServerCampaignBotsInline(admin.TabularInline):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
+class PrimaryDialerInline(admin.TabularInline):
+    """Inline for managing Primary Dialers within DialerSettings"""
+    model = PrimaryDialer
+    extra = 1
+    fields = ['admin_link', 'admin_username', 'admin_password', 'fronting_campaign', 'verifier_campaign', 'port']
+    verbose_name = 'Primary Dialer'
+    verbose_name_plural = 'Primary Dialers'
+
+
 # ============================================================================
 # SECTION 2: CAMPAIGN MODEL WITH INLINE CAMPAIGN AND MODEL MANAGEMENT
 # ============================================================================
@@ -121,8 +130,6 @@ class CampaignAdmin(admin.ModelAdmin):
     search_fields = ['name', 'description']
 
     def has_module_permission(self, request):
-        if not request.user.is_authenticated:
-            return False
         return False
 
     def has_view_permission(self, request, obj=None):
@@ -152,8 +159,6 @@ class ModelAdmin(admin.ModelAdmin):
     search_fields = ['name', 'description']
 
     def has_module_permission(self, request):
-        if not request.user.is_authenticated:
-            return False
         return False
 
     def has_view_permission(self, request, obj=None):
@@ -255,13 +260,31 @@ class ResponseCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(PrimaryDialer)
 class PrimaryDialerAdmin(admin.ModelAdmin):
-    list_display = ['id', 'admin_link', 'port', 'fronting_campaign', 'verifier_campaign']
+    list_display = ['id', 'admin_link', 'port', 'fronting_campaign', 'verifier_campaign', 'get_dialer_settings']
     search_fields = ['admin_link', 'fronting_campaign', 'verifier_campaign']
-    list_filter = ['port']
+    list_filter = ['port', 'dialer_settings']
+    
+    fieldsets = (
+        ('Dialer Connection', {
+            'fields': ('dialer_settings', 'admin_link', 'admin_username', 'admin_password', 'ip_validation_link', 'port')
+        }),
+        ('Campaign Settings', {
+            'fields': ('fronting_campaign', 'verifier_campaign')
+        }),
+    )
+
+    def get_dialer_settings(self, obj):
+        if obj.dialer_settings:
+            return f"Settings #{obj.dialer_settings.id}"
+        return "Not assigned"
+    get_dialer_settings.short_description = 'Dialer Settings'
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "dialer_settings":
+            kwargs["queryset"] = DialerSettings.objects.order_by('-id')
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def has_module_permission(self, request):
-        if not request.user.is_authenticated:
-            return False
         return False
 
     def has_view_permission(self, request, obj=None):
@@ -317,15 +340,23 @@ class CloserDialerAdmin(admin.ModelAdmin):
 
 @admin.register(DialerSettings)
 class DialerSettingsAdmin(admin.ModelAdmin):
-    list_display = ['id', 'primary_dialer', 'closer_dialer', 'get_client_campaigns_count']
-    list_filter = ['primary_dialer', 'closer_dialer']
-    search_fields = ['primary_dialer__admin_link', 'closer_dialer__admin_link']
+    inlines = [PrimaryDialerInline]
+    list_display = ['id', 'get_primary_dialers_count', 'closer_dialer', 'get_client_campaigns_count']
+    list_filter = ['closer_dialer']
+    search_fields = ['closer_dialer__admin_link', 'id']
     
     fieldsets = (
         ('Dialer Configuration', {
-            'fields': ('primary_dialer', 'closer_dialer')
+            'fields': ('closer_dialer',),
+            'description': 'Configure the closer dialer for this settings group. Primary dialers are managed below.'
         }),
     )
+
+    def get_primary_dialers_count(self, obj):
+        """Display count of primary dialers"""
+        count = obj.primary_dialers.count()
+        return f"{count} dialer(s)"
+    get_primary_dialers_count.short_description = 'Primary Dialers'
 
     def get_client_campaigns_count(self, obj):
         count = obj.client_campaigns.count()
@@ -333,15 +364,11 @@ class DialerSettingsAdmin(admin.ModelAdmin):
     get_client_campaigns_count.short_description = 'Used By'
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "primary_dialer":
-            kwargs["queryset"] = PrimaryDialer.objects.order_by('-id')
         if db_field.name == "closer_dialer":
             kwargs["queryset"] = CloserDialer.objects.order_by('-id')
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def has_module_permission(self, request):
-        if not request.user.is_authenticated:
-            return False
         return False
 
     def has_view_permission(self, request, obj=None):
@@ -376,8 +403,6 @@ class CampaignRequirementsAdmin(admin.ModelAdmin):
     search_fields = ['name', 'description']
 
     def has_module_permission(self, request):
-        if not request.user.is_authenticated:
-            return False
         return False
 
     def has_view_permission(self, request, obj=None):
@@ -442,8 +467,6 @@ class StatusHistoryAdmin(admin.ModelAdmin):
     date_hierarchy = 'start_date'
     
     def has_module_permission(self, request):
-        if not request.user.is_authenticated:
-            return False
         return False
     
     def has_view_permission(self, request, obj=None):
@@ -457,9 +480,6 @@ class StatusHistoryAdmin(admin.ModelAdmin):
         return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
     
     def has_change_permission(self, request, obj=None):
-        if not request.user.is_authenticated:
-            return False
-        # Make it readonly by returning False for change permission
         return False
     
     def has_delete_permission(self, request, obj=None):
@@ -469,13 +489,13 @@ class StatusHistoryAdmin(admin.ModelAdmin):
 
 
 # ============================================================================
-# SECTION 6: CLIENT CAMPAIGNS (Main Interface with Inline Dialers)
+# SECTION 6: CLIENT CAMPAIGNS (Main Interface)
 # ============================================================================
 
 class ClientCampaignModelForm(forms.ModelForm):
     class Meta:
         model = ClientCampaignModel
-        exclude = ['status_history']  # Exclude status_history from the form
+        exclude = ['status_history']
         widgets = {
             'custom_comments': forms.Textarea(attrs={'rows': 3}),
             'current_remote_agents': forms.Textarea(attrs={'rows': 3}),
@@ -486,7 +506,7 @@ class ClientCampaignModelForm(forms.ModelForm):
         self.fields['client'].queryset = Client.objects.filter(is_archived=False).select_related('client').order_by('name')
         self.fields['campaign_model'].queryset = CampaignModel.objects.select_related('campaign', 'model').order_by('campaign__name', 'model__name')
         self.fields['campaign_model'].label_from_instance = lambda obj: f"{obj.campaign.name} - {obj.model.name}"
-        self.fields['dialer_settings'].queryset = DialerSettings.objects.select_related('primary_dialer', 'closer_dialer').order_by('-id')
+        self.fields['dialer_settings'].queryset = DialerSettings.objects.select_related('closer_dialer').prefetch_related('primary_dialers').order_by('-id')
         self.fields['campaign_requirements'].queryset = CampaignRequirements.objects.order_by('name')
         
         if not self.instance.pk:
@@ -618,8 +638,6 @@ class ServerCampaignBotsAdmin(admin.ModelAdmin):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def has_module_permission(self, request):
-        if not request.user.is_authenticated:
-            return False
         return False
 
     def has_view_permission(self, request, obj=None):
