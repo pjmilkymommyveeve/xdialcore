@@ -91,25 +91,6 @@ class ResponseCategory(models.Model):
         return self.name
 
 
-class CampaignRequirements(models.Model):
-    name = models.CharField(max_length=255)
-    description = models.TextField(blank=True, null=True)
-    long_call_scripts_active = models.BooleanField(default=False)
-    disposition_set = models.BooleanField(default=False)
-    bot_count = models.IntegerField(blank=True, null=True)
-    
-    class Meta:
-        db_table = 'campaign_requirements'
-        verbose_name = 'Campaign Requirement'
-        verbose_name_plural = 'Campaign Requirements'
-        indexes = [
-            models.Index(fields=['name'], name='idx_campaign_requirements_name'),
-        ]
-    
-    def __str__(self):
-        return self.name
-
-
 class Status(models.Model):
     status_name = models.CharField(max_length=100)
     updated_at = models.DateTimeField(auto_now=True)
@@ -159,7 +140,6 @@ class PrimaryDialer(models.Model):
     verifier_campaign = models.CharField(max_length=255, blank=True, null=True)
     port = models.IntegerField(default=5060)
     
-    # ADD THIS: Link to DialerSettings
     dialer_settings = models.ForeignKey(
         'DialerSettings',
         on_delete=models.CASCADE,
@@ -203,9 +183,6 @@ class CloserDialer(models.Model):
 
 
 class DialerSettings(models.Model):
-    # REMOVE: primary_dialers ManyToManyField
-    # Primary dialers now reference this model via ForeignKey (reverse relation)
-    
     closer_dialer = models.ForeignKey(
         CloserDialer,
         on_delete=models.RESTRICT,
@@ -251,7 +228,9 @@ class ClientCampaignModel(models.Model):
     current_remote_agents = models.TextField(blank=True, null=True)
     is_active = models.BooleanField(default=False)
     is_enabled = models.BooleanField(default=True)
-    approved = models.BooleanField(default=False)
+    is_approved = models.BooleanField(default=False)
+    
+    # Dialer configuration
     dialer_settings = models.ForeignKey(
         DialerSettings,
         on_delete=models.SET_NULL,
@@ -259,13 +238,10 @@ class ClientCampaignModel(models.Model):
         blank=True,
         null=True
     )
-    campaign_requirements = models.ForeignKey(
-        CampaignRequirements,
-        on_delete=models.SET_NULL,
-        related_name='client_campaigns',
-        blank=True,
-        null=True
-    )
+    
+    bot_count = models.IntegerField(default=0, help_text="Number of bots for this campaign")
+    long_call_scripts_active = models.BooleanField(default=False, help_text="Are long call scripts active?")
+    disposition_set = models.BooleanField(default=False, help_text="Is disposition set configured?")
     
     class Meta:
         db_table = 'client_campaign_model'
@@ -276,9 +252,10 @@ class ClientCampaignModel(models.Model):
             models.Index(fields=['campaign_model'], name='idx_ccm_camp_model'),
             models.Index(fields=['is_active'], name='idx_ccm_active'),
             models.Index(fields=['is_enabled'], name='idx_ccm_enabled'),
-            models.Index(fields=['approved'], name='idx_ccm_approved'),
+            models.Index(fields=['is_approved'], name='idx_ccm_approved'),
             models.Index(fields=['start_date'], name='idx_ccm_start'),
             models.Index(fields=['end_date'], name='idx_ccm_end'),
+            models.Index(fields=['bot_count'], name='idx_ccm_bot_count'),
         ]
     
     def __str__(self):

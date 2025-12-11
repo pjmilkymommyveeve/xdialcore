@@ -8,7 +8,6 @@ from .models import (
     CampaignModel,
     Voice,
     ResponseCategory,
-    CampaignRequirements,
     Status,
     StatusHistory,
     PrimaryDialer,
@@ -220,8 +219,9 @@ class VoiceAdmin(admin.ModelAdmin):
 
 @admin.register(ResponseCategory)
 class ResponseCategoryAdmin(admin.ModelAdmin):
-    list_display = ['name', 'get_call_count']
+    list_display = ['name', 'color', 'get_call_count']
     search_fields = ['name']
+    list_filter = ['color']
 
     def get_call_count(self, obj):
         """Display number of calls with this response category"""
@@ -396,36 +396,6 @@ class DialerSettingsAdmin(admin.ModelAdmin):
 # SECTION 5: SUPPORTING MODELS
 # ============================================================================
 
-@admin.register(CampaignRequirements)
-class CampaignRequirementsAdmin(admin.ModelAdmin):
-    list_display = ['name', 'long_call_scripts_active', 'bot_count']
-    list_filter = ['long_call_scripts_active']
-    search_fields = ['name', 'description']
-
-    def has_module_permission(self, request):
-        return False
-
-    def has_view_permission(self, request, obj=None):
-        if not request.user.is_authenticated:
-            return False
-        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
-
-    def has_add_permission(self, request):
-        if not request.user.is_authenticated:
-            return False
-        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
-
-    def has_change_permission(self, request, obj=None):
-        if not request.user.is_authenticated:
-            return False
-        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
-
-    def has_delete_permission(self, request, obj=None):
-        if not request.user.is_authenticated:
-            return False
-        return request.user.is_superuser or request.user.is_admin
-
-
 @admin.register(Status)
 class StatusAdmin(admin.ModelAdmin):
     list_display = ['status_name', 'updated_at']
@@ -507,7 +477,6 @@ class ClientCampaignModelForm(forms.ModelForm):
         self.fields['campaign_model'].queryset = CampaignModel.objects.select_related('campaign', 'model').order_by('campaign__name', 'model__name')
         self.fields['campaign_model'].label_from_instance = lambda obj: f"{obj.campaign.name} - {obj.model.name}"
         self.fields['dialer_settings'].queryset = DialerSettings.objects.select_related('closer_dialer').prefetch_related('primary_dialers').order_by('-id')
-        self.fields['campaign_requirements'].queryset = CampaignRequirements.objects.order_by('name')
         
         if not self.instance.pk:
             self.initial['start_date'] = timezone.now()
@@ -516,10 +485,13 @@ class ClientCampaignModelForm(forms.ModelForm):
         self.fields['client'].help_text = "Select the client (only non-archived clients shown)"
         self.fields['campaign_model'].help_text = "Select campaign and model combination"
         self.fields['dialer_settings'].help_text = "Select or create dialer settings (use Dialer Settings menu to manage)"
-        self.fields['campaign_requirements'].help_text = "Optional: Select campaign requirements"
         self.fields['is_active'].help_text = "Is this campaign currently running?"
         self.fields['is_enabled'].help_text = "Is this configuration enabled for use?"
+        self.fields['is_approved'].help_text = "Has this campaign been approved?"
         self.fields['is_custom'].help_text = "Check if this is a custom configuration"
+        self.fields['bot_count'].help_text = "Number of bots for this campaign"
+        self.fields['long_call_scripts_active'].help_text = "Are long call scripts active?"
+        self.fields['disposition_set'].help_text = "Is disposition set configured?"
 
     def clean(self):
         cleaned_data = super().clean()
@@ -546,9 +518,9 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
     inlines = [ServerCampaignBotsInline]
     readonly_fields = ['status_history']
     
-    list_display = ['get_client_name', 'get_campaign', 'get_model', 'is_active', 'is_enabled', 'start_date']
-    list_filter = ['is_active', 'is_enabled', 'is_custom', 'start_date']
-    search_fields = ['client__name', 'campaign_model__campaign__name', 'campaign_model__model__name']
+    list_display = ['id', 'get_client_name', 'get_campaign', 'get_model', 'is_active', 'is_enabled', 'is_approved', 'bot_count', 'start_date']
+    list_filter = ['is_active', 'is_enabled', 'is_approved', 'is_custom', 'long_call_scripts_active', 'disposition_set', 'start_date']
+    search_fields = ['id', 'client__name', 'campaign_model__campaign__name', 'campaign_model__model__name']
     date_hierarchy = 'start_date'
     list_select_related = ['client__client', 'campaign_model__campaign', 'campaign_model__model']
     
@@ -557,15 +529,18 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
             'fields': ('client', 'campaign_model', 'start_date', 'end_date')
         }),
         ('Status', {
-            'fields': ('is_active', 'is_enabled', 'status_history')
+            'fields': ('is_active', 'is_enabled', 'is_approved', 'status_history')
+        }),
+        ('Campaign Configuration', {
+            'fields': ('bot_count', 'long_call_scripts_active', 'disposition_set'),
         }),
         ('Customization', {
             'fields': ('is_custom', 'custom_comments', 'current_remote_agents'),
             'classes': ('collapse',)
         }),
-        ('Configuration', {
-            'fields': ('dialer_settings', 'campaign_requirements'),
-            'description': 'Select existing configuration or create new via the respective admin sections'
+        ('Dialer Configuration', {
+            'fields': ('dialer_settings',),
+            'description': 'Select existing configuration or create new via the Dialer Settings admin section'
         }),
     )
 

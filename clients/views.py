@@ -3,13 +3,27 @@ from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Count, Q
 from core.decorators import role_required
+from django.contrib.auth.hashers import make_password   
 from accounts.models import Role
 from .models import Client
 from campaigns.models import ClientCampaignModel, ResponseCategory
 from calls.models import Call
 from datetime import datetime
+from django.db import transaction
+from accounts.models import User
 import csv
 import json
+from campaigns.models import (
+    Campaign, 
+    Model, 
+    CampaignModel, 
+    ClientCampaignModel,
+    PrimaryDialer, 
+    CloserDialer, 
+    DialerSettings,
+    Status, 
+    StatusHistory
+)
 
 
 @login_required
@@ -222,7 +236,7 @@ def campaign_dashboard(request, campaign_id):
             'id': call.id,
             'number': call.number,
             'list_id': call.list_id or 'N/A',
-            'category_color': call.response_category.color if call.response_category else '#6B7280',  # Add this line
+            'category_color': call.response_category.color if call.response_category else '#6B7280',
             'category': call.response_category.name.capitalize() if call.response_category else 'Unknown',
             'timestamp': call.timestamp.strftime('%m/%d/%Y, %H:%M:%S'),
             'has_transcription': bool(call.transcription),
@@ -425,3 +439,194 @@ def data_export(request, campaign_id):
     }
     
     return render(request, 'clients/data_export.html', context)
+
+
+def integration_request(request):
+    """
+    Public integration request form.
+    GET: Display form with dynamic campaign/model data
+    POST: Process form and create all database entries
+    """
+    if request.method == 'GET':
+        # Fetch all campaigns and models from database
+        campaigns = Campaign.objects.all().order_by('name')
+        models = Model.objects.all().order_by('name')
+        
+        # Build campaign config mapping (campaign -> available models)
+        campaign_config = {}
+        for cm in CampaignModel.objects.select_related('campaign', 'model'):
+            campaign_name = cm.campaign.name
+            model_name = cm.model.name
+            if campaign_name not in campaign_config:
+                campaign_config[campaign_name] = []
+            campaign_config[campaign_name].append(model_name)
+        
+        context = {
+            'campaigns': campaigns,
+            'models': models,
+            'campaign_config': json.dumps(campaign_config),
+        }
+        return render(request, 'clients/integration_request.html', context)
+    
+    elif request.method == 'POST':
+        try:
+            # Parse JSON data from request body
+            data = json.loads(request.body)
+            
+            # Validate required fields
+            required_fields = [
+                'companyName', 'campaign', 'model', 'numberOfBots',
+                'primaryIpValidation', 'primaryAdminLink',
+                'primaryUser', 'primaryPassword'
+            ]
+            
+            for field in required_fields:
+                if not data.get(field):
+                    return JsonResponse({
+                        'success': False,
+                        'message': f'Missing required field: {field}'
+                    }, status=400)
+            
+            # Start database transaction
+            with transaction.atomic():
+                # 1. Create User account with CLIENT role
+                client_role = Role.objects.get(name=Role.CLIENT)
+                
+                # Generate unique username from company name
+                base_username = data['companyName'].lower().replace(' ', '_')
+                username = base_username
+                counter = 1
+                while User.objects.filter(username=username).exists():
+                    username = f"{base_username}_{counter}"
+                    counter += 1
+                
+                user = User.objects.create(
+                    username=username,
+                    password=make_password('clientdefault123'),
+                    role=client_role,
+                    is_active=True
+                )
+                
+                # 2. Create Client profile
+                client = Client.objects.create(
+                    client=user,
+                    name=data['companyName'],
+                    is_archived=False
+                )
+                
+                # 3. Get or create Campaign
+                campaign, _ = Campaign.objects.get_or_create(
+                    name=data['campaign'],
+                    defaults={'description': f'{data["campaign"]} campaign'}
+                )
+                
+                # 4. Get or create Model
+                model, _ = Model.objects.get_or_create(
+                    name=data['model'],
+                    defaults={
+                        'description': f'{data["model"]} model',
+                        'transfer_settings': data.get('transferSettings', 'balanced')
+                    }
+                )
+                
+                # 5. Get or create CampaignModel association
+                campaign_model, _ = CampaignModel.objects.get_or_create(
+                    campaign=campaign,
+                    model=model
+                )
+                
+                # 6. Create CloserDialer (if separate dialer)
+                closer_dialer = None
+                if data.get('setupType') == 'separate':
+                    closer_dialer = CloserDialer.objects.create(
+                        ip_validation_link=data.get('closerIpValidation', ''),
+                        admin_link=data.get('closerAdminLink', ''),
+                        admin_username=data.get('closerUser', ''),
+                        admin_password=data.get('closerPassword', ''),
+                        closer_campaign=data.get('closerCampaign', ''),
+                        ingroup=data.get('closerIngroup', ''),
+                        port=int(data.get('closerPort', 5060))
+                    )
+                
+                # 7. Create DialerSettings
+                dialer_settings = DialerSettings.objects.create(
+                    closer_dialer=closer_dialer
+                )
+                
+                # 8. Create PrimaryDialer and link to DialerSettings
+                primary_dialer = PrimaryDialer.objects.create(
+                    ip_validation_link=data['primaryIpValidation'],
+                    admin_link=data['primaryAdminLink'],
+                    admin_username=data['primaryUser'],
+                    admin_password=data['primaryPassword'],
+                    fronting_campaign=data.get('primaryBotsCampaign', ''),
+                    verifier_campaign=data.get('primaryUserSeries', ''),
+                    port=int(data.get('primaryPort', 5060)),
+                    dialer_settings=dialer_settings
+                )
+                
+                # 9. Create Status
+                status = Status.objects.create(
+                    status_name='Pending Approval'
+                )
+                
+                # 10. Create StatusHistory
+                status_history = StatusHistory.objects.create(
+                    status=status,
+                    start_date=datetime.now(),
+                    end_date=None
+                )
+                
+                # 11. Create ClientCampaignModel (main entry) with campaign requirements
+                client_campaign_model = ClientCampaignModel.objects.create(
+                    client=client,
+                    campaign_model=campaign_model,
+                    status_history=status_history,
+                    start_date=datetime.now(),
+                    end_date=None,
+                    is_custom=bool(data.get('customRequirements')),
+                    custom_comments=data.get('customRequirements', ''),
+                    current_remote_agents=data.get('customRequirements', ''),
+                    is_active=False,  # Not active until approved
+                    is_enabled=True,
+                    is_approved=False,  # Requires admin approval
+                    dialer_settings=dialer_settings,
+                    # Campaign requirements fields (moved from separate table)
+                    bot_count=int(data['numberOfBots']),
+                    long_call_scripts_active=False,  # Default to False
+                    disposition_set=False  # Default to False
+                )
+                
+                # Return success response
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Integration request submitted successfully!',
+                    'data': {
+                        'username': username,
+                        'client_id': client.client_id,
+                        'campaign_id': client_campaign_model.id
+                    }
+                }, status=201)
+        
+        except Role.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': 'Client role not found in system. Please contact administrator.'
+            }, status=500)
+        
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid JSON data'
+            }, status=400)
+        
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'An error occurred: {str(e)}'
+            }, status=500)
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method'
+    }, status=405)
