@@ -1,10 +1,31 @@
 from django.db import models
 
 
+class TransferSettings(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    
+    class Meta:
+        db_table = 'transfer_settings'
+        verbose_name = 'Transfer Setting'
+        verbose_name_plural = 'Transfer Settings'
+        indexes = [
+            models.Index(fields=['name'], name='idx_transfer_settings_name'),
+        ]
+    
+    def __str__(self):
+        return self.name
+
+
 class Model(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    transfer_settings = models.TextField(blank=True, null=True)
+    transfer_settings = models.ForeignKey(
+        TransferSettings,
+        on_delete=models.SET_NULL,
+        related_name='models',
+        blank=True,
+        null=True
+    )
     
     class Meta:
         db_table = 'models'
@@ -12,6 +33,7 @@ class Model(models.Model):
         verbose_name_plural = 'Models'
         indexes = [
             models.Index(fields=['name'], name='idx_models_name'),
+            models.Index(fields=['transfer_settings'], name='idx_models_transfer_settings'),
         ]
     
     def __str__(self):
@@ -139,7 +161,6 @@ class PrimaryDialer(models.Model):
     fronting_campaign = models.CharField(max_length=255, blank=True, null=True)
     verifier_campaign = models.CharField(max_length=255, blank=True, null=True)
     port = models.IntegerField(default=5060)
-    
     dialer_settings = models.ForeignKey(
         'DialerSettings',
         on_delete=models.CASCADE,
@@ -229,7 +250,6 @@ class ClientCampaignModel(models.Model):
     is_active = models.BooleanField(default=False)
     is_enabled = models.BooleanField(default=True)
     is_approved = models.BooleanField(default=False)
-    
     # Dialer configuration
     dialer_settings = models.ForeignKey(
         DialerSettings,
@@ -238,7 +258,6 @@ class ClientCampaignModel(models.Model):
         blank=True,
         null=True
     )
-    
     bot_count = models.IntegerField(default=0, help_text="Number of bots for this campaign")
     long_call_scripts_active = models.BooleanField(default=False, help_text="Are long call scripts active?")
     disposition_set = models.BooleanField(default=False, help_text="Is disposition set configured?")

@@ -26,7 +26,7 @@ from campaigns.models import (
 )
 
 
-@login_required
+@login_required(login_url='/accounts/login/')
 @role_required([Role.CLIENT])
 def client_landing(request):
     """Client landing page showing their campaigns"""
@@ -87,10 +87,10 @@ def client_landing(request):
     return render(request, 'clients/client_landing.html', context)
 
 
-@login_required
+@login_required(login_url='/accounts/login/')
 @role_required([Role.CLIENT])
 def campaign_dashboard(request, campaign_id):
-    """Campaign dashboard showing call records"""
+    """Campaign dashboard showing call records - latest stage only"""
     try:
         client = Client.objects.get(client=request.user)
     except Client.DoesNotExist:
@@ -108,7 +108,7 @@ def campaign_dashboard(request, campaign_id):
         is_enabled=True
     )
     
-    # Get filter parameters first (moved up)
+    # Get filter parameters
     search_query = request.GET.get('search', '').strip()
     list_id_query = request.GET.get('list_id', '').strip()
     start_date = request.GET.get('start_date', '')
@@ -121,15 +121,28 @@ def campaign_dashboard(request, campaign_id):
     has_any_filter = any([search_query, list_id_query, start_date, end_date, selected_categories])
     
     if not has_any_filter:
-        # Set default to today
         today = datetime.now().date()
         start_date = today.strftime('%Y-%m-%d')
         end_date = today.strftime('%Y-%m-%d')
     
-    # Build base query for category counts with filters applied
-    category_count_query = Call.objects.filter(client_campaign_model=campaign)
+    # Base query - get latest stage calls using subquery
+    from django.db.models import OuterRef, Subquery, Max
     
-    # Apply same filters to category counts
+    # Subquery to get the maximum stage for each number
+    latest_stage_subquery = Call.objects.filter(
+        client_campaign_model=campaign,
+        number=OuterRef('number')
+    ).values('number').annotate(
+        max_stage=Max('stage')
+    ).values('max_stage')
+    
+    # Build base query for category counts with latest stage filter
+    category_count_query = Call.objects.filter(
+        client_campaign_model=campaign,
+        stage=Subquery(latest_stage_subquery)
+    )
+    
+    # Apply filters to category counts
     if search_query:
         category_count_query = category_count_query.filter(
             Q(number__icontains=search_query) |
@@ -155,7 +168,7 @@ def campaign_dashboard(request, campaign_id):
             end_datetime = datetime.combine(end_datetime.date(), datetime.max.time())
         category_count_query = category_count_query.filter(timestamp__lte=end_datetime)
     
-    # Get category counts based on filtered calls
+    # Get category counts based on filtered calls (latest stage only)
     category_counts_raw = category_count_query.values(
         'response_category__id',
         'response_category__name'
@@ -175,27 +188,10 @@ def campaign_dashboard(request, campaign_id):
             'count': category_count_dict.get(category.name, 0)
         })
     
-    # Get filter parameters
-    search_query = request.GET.get('search', '').strip()
-    list_id_query = request.GET.get('list_id', '').strip()
-    start_date = request.GET.get('start_date', '')
-    start_time = request.GET.get('start_time', '')
-    end_date = request.GET.get('end_date', '')
-    end_time = request.GET.get('end_time', '')
-    selected_categories = request.GET.getlist('categories')
-    
-    # Default to today if no date filters are provided
-    has_any_filter = any([search_query, list_id_query, start_date, end_date, selected_categories])
-    
-    if not has_any_filter:
-        # Set default to today
-        today = datetime.now().date()
-        start_date = today.strftime('%Y-%m-%d')
-        end_date = today.strftime('%Y-%m-%d')
-    
-    # Base query
+    # Base query for calls - only latest stage per number
     calls = Call.objects.filter(
-        client_campaign_model=campaign
+        client_campaign_model=campaign,
+        stage=Subquery(latest_stage_subquery)
     ).select_related('response_category', 'voice').order_by('-timestamp')
     
     # Apply filters
@@ -239,6 +235,7 @@ def campaign_dashboard(request, campaign_id):
             'category_color': call.response_category.color if call.response_category else '#6B7280',
             'category': call.response_category.name.capitalize() if call.response_category else 'Unknown',
             'timestamp': call.timestamp.strftime('%m/%d/%Y, %H:%M:%S'),
+            'stage': call.stage or 0,
             'has_transcription': bool(call.transcription),
             'transcription': call.transcription or 'No transcript available',
         })
@@ -267,8 +264,7 @@ def campaign_dashboard(request, campaign_id):
     
     return render(request, 'clients/campaign_dashboard.html', context)
 
-
-@login_required
+@login_required(login_url='/accounts/login/')
 @role_required([Role.CLIENT])
 def campaign_recordings(request, campaign_id):
     """
@@ -316,7 +312,7 @@ def campaign_recordings(request, campaign_id):
     return render(request, 'clients/campaign_recordings.html', context)
 
 
-@login_required
+@login_required(login_url='/accounts/login/')
 @role_required([Role.CLIENT])
 def data_export(request, campaign_id):
     """Data export page"""

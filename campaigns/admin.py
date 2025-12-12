@@ -3,6 +3,7 @@ from django import forms
 from django.utils import timezone
 from django.db import transaction
 from .models import (
+    TransferSettings,
     Model,
     Campaign,
     CampaignModel,
@@ -90,7 +91,15 @@ class CampaignModelAdmin(admin.ModelAdmin):
         if db_field.name == "campaign":
             kwargs["queryset"] = Campaign.objects.order_by('name')
         if db_field.name == "model":
-            kwargs["queryset"] = Model.objects.order_by('name')
+            kwargs["queryset"] = Model.objects.select_related('transfer_settings').order_by('name')
+            # Customize the display to show model name with transfer settings
+            formfield = super().formfield_for_foreignkey(db_field, request, **kwargs)
+            formfield.label_from_instance = lambda obj: (
+                f"{obj.name} - {obj.transfer_settings.name}" 
+                if obj.transfer_settings 
+                else f"{obj.name} - No Transfer Settings"
+            )
+            return formfield
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def has_module_permission(self, request):
@@ -118,10 +127,45 @@ class CampaignModelAdmin(admin.ModelAdmin):
             return False
         return request.user.is_superuser or request.user.is_admin
 
+# ============================================================================
+# SECTION 3: STANDALONE MODELS (TransferSettings, Campaign, Model, Voice, ResponseCategory)
+# ============================================================================
 
-# ============================================================================
-# SECTION 3: STANDALONE MODELS (Campaign, Model, Voice, ResponseCategory)
-# ============================================================================
+@admin.register(TransferSettings)
+class TransferSettingsAdmin(admin.ModelAdmin):
+    list_display = ['name', 'get_model_count']
+    search_fields = ['name']
+
+    def get_model_count(self, obj):
+        """Display number of models using this transfer setting"""
+        return obj.models.count()
+    get_model_count.short_description = 'Models Using'
+
+    def has_module_permission(self, request):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+
+    def has_view_permission(self, request, obj=None):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding or request.user.is_qa
+
+    def has_add_permission(self, request):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+
+    def has_change_permission(self, request, obj=None):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+
+    def has_delete_permission(self, request, obj=None):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin
+
 
 @admin.register(Campaign)
 class CampaignAdmin(admin.ModelAdmin):
@@ -154,8 +198,19 @@ class CampaignAdmin(admin.ModelAdmin):
 
 @admin.register(Model)
 class ModelAdmin(admin.ModelAdmin):
-    list_display = ['name', 'description']
+    list_display = ['name', 'description', 'get_transfer_settings']
     search_fields = ['name', 'description']
+    list_filter = ['transfer_settings']
+
+    def get_transfer_settings(self, obj):
+        return obj.transfer_settings.name if obj.transfer_settings else "Not Set"
+    get_transfer_settings.short_description = 'Transfer Settings'
+    get_transfer_settings.admin_order_field = 'transfer_settings__name'
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "transfer_settings":
+            kwargs["queryset"] = TransferSettings.objects.order_by('name')
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def has_module_permission(self, request):
         return False
