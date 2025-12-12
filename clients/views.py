@@ -27,6 +27,50 @@ from campaigns.models import (
 )
 
 
+# Edit this only |
+CATEGORY_MAPPING = {
+    "ANSWER_MACHINE_greeting": "Answering Machine",
+    "ANSWER_MACHINE": "Answering Machine",
+    "ANSWER_MACHINE_hello": "Answering Machine",
+
+    "DO_NOT_CALL": "Do Not Call",
+    "DO_NOT_CALL_greeting": "Do Not Call",
+    "DO_NOT_CALL_hello": "Do Not Call",
+
+    "DNQ": "Do Not Qualify",
+
+    "NOT_INTERESTED": "Not Interested",
+    "NOT_INTERESTED_transfer": "Not Interested",
+
+    "Not_Responding": "Not Responding",
+    "Not_Responding_greeting": "Not Responding",
+    "Not_Responding_hello": "Not Responding",
+
+    "neutral_keywords": "Neutral",
+    "already_keywords": "Neutral",
+    "busy_keywords": "Neutral",
+    "rebuttal_keywords": "Neutral",
+
+    "INTERESTED": "Interested",
+    "INTERESTED_transfer": "Interested",
+
+    "UNKNOWN_hello": "Unknown",
+    "UNKNOWN_greeting": "Unknown",
+    "UNKNOWN": "Unknown",
+    "UNKNOWN_transfer": "Unknown",
+
+    "User_Silent_hello": "User Silent",
+    "User_Silent_greeting": "User Silent",
+    "User Slient": "User Silent",  
+
+    "Honeypot_K_hello": "Honeypot",
+    "Honeypot_K_greeting": "Honeypot",
+    "Honeypot_K": "Honeypot",
+    "Honeypot_S": "Honeypot",
+}
+
+
+
 @login_required(login_url='/accounts/login/')
 @role_required([Role.CLIENT])
 def client_landing(request):
@@ -91,7 +135,7 @@ def client_landing(request):
 @login_required(login_url='/accounts/login/')
 @role_required([Role.CLIENT])
 def campaign_dashboard(request, campaign_id):
-    """Campaign dashboard showing call records - latest stage only"""
+    """Campaign dashboard showing call records - latest stage only with combined categories"""
     try:
         client = Client.objects.get(client=request.user)
     except Client.DoesNotExist:
@@ -133,9 +177,9 @@ def campaign_dashboard(request, campaign_id):
     latest_stage_subquery = Call.objects.filter(
         client_campaign_model=campaign,
         number=OuterRef('number')
-    ).values('number').annotate(
+    ).order_by().values('number').annotate(
         max_stage=Max('stage')
-    ).values('max_stage')
+    ).values('max_stage')[:1]
     
     # Build base query for category counts with latest stage filter
     category_count_query = Call.objects.filter(
@@ -172,21 +216,54 @@ def campaign_dashboard(request, campaign_id):
     # Get category counts based on filtered calls (latest stage only)
     category_counts_raw = category_count_query.values(
         'response_category__id',
-        'response_category__name'
+        'response_category__name',
+        'response_category__color'
     ).annotate(count=Count('id'))
     
-    category_count_dict = {
-        item['response_category__name'] or 'UNKNOWN': item['count'] 
-        for item in category_counts_raw
-    }
+    # Get ALL categories from database to ensure we show all, even with zero counts
+    all_db_categories = ResponseCategory.objects.all().values('id', 'name', 'color')
     
+    # Combine categories according to mapping
+    combined_counts = {}
+    category_id_to_combined = {}  # Maps original category IDs to combined category names
+    category_colors = {}  # Store colors for combined categories
+    
+    # First, initialize all possible combined categories with zero counts
+    for db_cat in all_db_categories:
+        original_name = db_cat['name'] or 'UNKNOWN'
+        combined_name = CATEGORY_MAPPING.get(original_name, original_name)
+        
+        if combined_name not in combined_counts:
+            combined_counts[combined_name] = 0
+            category_colors[combined_name] = db_cat['color'] or '#6B7280'
+    
+    # Now add the actual counts
+    for item in category_counts_raw:
+        original_name = item['response_category__name'] or 'UNKNOWN'
+        original_id = item['response_category__id']
+        count = item['count']
+        color = item['response_category__color'] or '#6B7280'
+        
+        # Get the mapped category name
+        combined_name = CATEGORY_MAPPING.get(original_name, original_name)
+        
+        # Store mapping of original ID to combined name
+        category_id_to_combined[original_id] = combined_name
+        
+        # Accumulate counts for combined categories
+        combined_counts[combined_name] += count
+        # Update color if we didn't have one yet
+        if not category_colors.get(combined_name):
+            category_colors[combined_name] = color
+    
+    # Build the all_categories list with combined categories
     all_categories = []
-    for category in ResponseCategory.objects.all().order_by('name'):
+    for combined_name, count in sorted(combined_counts.items()):
         all_categories.append({
-            'id': category.id,
-            'name': category.name.capitalize(),
-            'color': category.color,
-            'count': category_count_dict.get(category.name, 0)
+            'name': combined_name.capitalize(),
+            'color': category_colors.get(combined_name, '#6B7280'),
+            'count': count,
+            'original_name': combined_name  # Keep for filtering
         })
     
     # Base query for calls - only latest stage per number
@@ -221,20 +298,32 @@ def campaign_dashboard(request, campaign_id):
             end_datetime = datetime.combine(end_datetime.date(), datetime.max.time())
         calls = calls.filter(timestamp__lte=end_datetime)
     
+    # Filter by combined categories if selected
     if selected_categories:
-        calls = calls.filter(response_category__id__in=selected_categories)
+        # Find all original category names that map to selected combined categories
+        original_names = [
+            name for name, combined in CATEGORY_MAPPING.items() 
+            if combined in selected_categories
+        ]
+        # Also include the combined names themselves if they weren't mapped
+        original_names.extend([cat for cat in selected_categories if cat not in CATEGORY_MAPPING.values()])
+        
+        calls = calls.filter(response_category__name__in=original_names)
     
     total_calls = calls.count()
     
-    # Process calls - store transcript as plain text
+    # Process calls - store transcript as plain text with combined category names
     calls_data = []
     for call in calls[:50]:
+        original_category_name = call.response_category.name if call.response_category else 'Unknown'
+        combined_category_name = CATEGORY_MAPPING.get(original_category_name, original_category_name)
+        
         calls_data.append({
             'id': call.id,
             'number': call.number,
             'list_id': call.list_id or 'N/A',
             'category_color': call.response_category.color if call.response_category else '#6B7280',
-            'category': call.response_category.name.capitalize() if call.response_category else 'Unknown',
+            'category': combined_category_name.capitalize(),
             'timestamp': call.timestamp.strftime('%m/%d/%Y, %H:%M:%S'),
             'stage': call.stage or 0,
             'has_transcription': bool(call.transcription),
@@ -259,11 +348,12 @@ def campaign_dashboard(request, campaign_id):
             'start_time': start_time,
             'end_date': end_date,
             'end_time': end_time,
-            'selected_categories': [int(x) for x in selected_categories] if selected_categories else [],
+            'selected_categories': selected_categories,
         }
     }
     
     return render(request, 'clients/campaign_dashboard.html', context)
+
 
 @login_required(login_url='/accounts/login/')
 @role_required([Role.CLIENT])
