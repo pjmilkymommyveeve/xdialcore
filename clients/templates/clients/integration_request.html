@@ -5,13 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Remote Agent Integration Request</title>
     {% load static %}
-    
-    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
     <style>
         * {
             margin: 0;
@@ -22,33 +17,27 @@
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: #f5f5f7;
-            margin: 0;
-            padding: 0;
         }
 
         .integration-form-container {
             min-height: 100vh;
             background: #f5f5f7;
-            padding: 0;
         }
 
         .integration-form-wrapper {
             max-width: 100%;
             margin: 0 auto;
             background: #ffffff;
-            box-shadow: none;
             min-height: 100vh;
         }
 
-        /* Header Styles */
         .form-header {
             background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
             color: white;
             padding: 2rem 0;
-            position: relative;
         }
 
-        .form-header > div {
+        .form-header>div {
             max-width: 900px;
             margin: 0 auto;
             padding: 0 2rem;
@@ -59,18 +48,14 @@
             font-weight: 600;
             margin: 0 0 0.5rem 0;
             letter-spacing: -0.02em;
-            line-height: 1.3;
         }
 
         .form-subtitle {
             font-size: 1rem;
             margin: 0;
             opacity: 0.95;
-            font-weight: 400;
-            line-height: 1.5;
         }
 
-        /* Form Styles */
         .integration-form {
             max-width: 900px;
             margin: 0 auto;
@@ -83,10 +68,6 @@
             border-bottom: 1px solid #e5e7eb;
         }
 
-        .form-section:last-of-type {
-            border-bottom: none;
-        }
-
         .section-header {
             display: flex;
             align-items: center;
@@ -97,8 +78,6 @@
         .section-header i {
             font-size: 1.5rem;
             color: #7c3aed;
-            line-height: 1;
-            display: flex;
         }
 
         .section-header h2 {
@@ -106,10 +85,8 @@
             font-weight: 600;
             color: #1f2937;
             margin: 0;
-            letter-spacing: -0.01em;
         }
 
-        /* Integration Subsection */
         .integration-subsection {
             background: #f9fafb;
             padding: 1.75rem;
@@ -133,31 +110,16 @@
             gap: 0.5rem;
         }
 
-        .subsection-title i {
-            font-size: 1.125rem;
-            color: #7c3aed;
-        }
-
-        .closer-section .subsection-title i {
-            color: #d97706;
-        }
-
-        /* Form Groups */
         .form-group {
             margin-bottom: 1.5rem;
         }
 
-        .form-group:last-child {
-            margin-bottom: 0;
-        }
-
-        .form-group > label {
+        .form-group label {
             display: block;
             font-size: 0.875rem;
             font-weight: 500;
             color: #374151;
             margin-bottom: 0.5rem;
-            letter-spacing: 0;
         }
 
         .required {
@@ -166,9 +128,6 @@
         }
 
         .form-group input[type="text"],
-        .form-group input[type="email"],
-        .form-group input[type="tel"],
-        .form-group input[type="url"],
         .form-group input[type="number"],
         .form-group input[type="password"],
         .form-group select,
@@ -182,7 +141,6 @@
             transition: all 0.2s ease;
             font-family: 'Inter', sans-serif;
             background: #ffffff;
-            box-sizing: border-box;
         }
 
         .form-group select {
@@ -194,12 +152,6 @@
             padding-right: 2.5rem;
         }
 
-        .form-group input:hover,
-        .form-group select:hover,
-        .form-group textarea:hover {
-            border-color: #9ca3af;
-        }
-
         .form-group input:focus,
         .form-group select:focus,
         .form-group textarea:focus {
@@ -208,15 +160,9 @@
             box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
         }
 
-        .form-group input::placeholder,
-        .form-group textarea::placeholder {
-            color: #9ca3af;
-        }
-
         .form-group textarea {
             resize: vertical;
             min-height: 100px;
-            line-height: 1.6;
         }
 
         .form-hint {
@@ -224,11 +170,8 @@
             font-size: 0.8125rem;
             color: #6b7280;
             margin-top: 0.375rem;
-            font-weight: 400;
-            line-height: 1.4;
         }
 
-        /* Radio Group - Horizontal */
         .radio-group {
             display: flex;
             gap: 1rem;
@@ -247,10 +190,6 @@
             transition: all 0.2s ease;
             background: #ffffff;
             font-size: 0.9375rem;
-            font-weight: 400;
-            color: #374151;
-            user-select: none;
-            position: relative;
         }
 
         .radio-label:hover {
@@ -260,8 +199,6 @@
 
         .radio-label input[type="radio"] {
             appearance: none;
-            -webkit-appearance: none;
-            -moz-appearance: none;
             width: 20px;
             height: 20px;
             border: 2px solid #d1d5db;
@@ -269,13 +206,6 @@
             background: #ffffff;
             cursor: pointer;
             transition: all 0.15s ease;
-            flex-shrink: 0;
-            position: relative;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
 
         .radio-label input[type="radio"]:checked {
@@ -284,25 +214,17 @@
             border-width: 6px;
         }
 
-        .radio-label input[type="radio"]:focus {
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
-        }
-
         .radio-label:has(input[type="radio"]:checked) {
             border-color: #7c3aed;
             background: #faf5ff;
-            color: #1f2937;
         }
 
-        /* Form Row (for side-by-side inputs) */
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1.5rem;
         }
 
-        /* Slider Styles */
         .slider-container {
             width: 80%;
             margin: 1rem auto;
@@ -315,13 +237,11 @@
             background: #faf5ff;
             outline: none;
             -webkit-appearance: none;
-            appearance: none;
             cursor: pointer;
         }
 
         .quality-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
-            appearance: none;
             width: 24px;
             height: 24px;
             border-radius: 50%;
@@ -340,17 +260,6 @@
             cursor: pointer;
             border: 3px solid white;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-            transition: all 0.2s ease;
-        }
-
-        .quality-slider::-webkit-slider-thumb:hover {
-            transform: scale(1.1);
-            box-shadow: 0 3px 12px rgba(124, 58, 237, 0.4);
-        }
-
-        .quality-slider::-moz-range-thumb:hover {
-            transform: scale(1.1);
-            box-shadow: 0 3px 12px rgba(124, 58, 237, 0.4);
         }
 
         .slider-labels {
@@ -367,15 +276,6 @@
             transition: all 0.2s ease;
             text-align: center;
             flex: 1;
-            padding: 0 60px;
-        }
-
-        .slider-labels span:first-child {
-            padding-left: 0;
-        }
-
-        .slider-labels span:last-child {
-            padding-right: 0;
         }
 
         .slider-labels span.active {
@@ -383,7 +283,6 @@
             font-weight: 600;
         }
 
-        /* Transfer Info Box */
         .transfer-info-box {
             margin-top: 1.5rem;
             padding: 1.25rem;
@@ -391,7 +290,6 @@
             border: 2px solid #e9d5ff;
             border-radius: 10px;
             animation: fadeIn 0.3s ease-out;
-            margin-bottom: 20px;
         }
 
         .info-header {
@@ -408,7 +306,6 @@
             padding: 0.375rem 0.75rem;
             background: #f3f4f6;
             border-radius: 6px;
-            letter-spacing: 0.02em;
         }
 
         .badge {
@@ -416,11 +313,15 @@
             padding: 0.375rem 0.875rem;
             background: transparent;
             color: #374151;
-            border: none;
             border-radius: 6px;
             font-size: 0.75rem;
             font-weight: 500;
-            letter-spacing: 0.02em;
+        }
+
+        .recommended-badge {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #86efac;
         }
 
         .transfer-info-box p {
@@ -430,12 +331,10 @@
             margin: 0;
         }
 
-        /* Metrics Grid */
         .metrics-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 1.5rem;
-            margin-bottom: 0;
             margin-top: 1rem;
         }
 
@@ -494,7 +393,6 @@
             font-size: 1.5rem;
             font-weight: 600;
             color: #111827;
-            font-variant-numeric: tabular-nums;
         }
 
         .metric-label {
@@ -504,7 +402,6 @@
             text-align: center;
         }
 
-        /* Form Actions */
         .form-actions {
             display: flex;
             justify-content: center;
@@ -525,7 +422,6 @@
             align-items: center;
             gap: 0.625rem;
             box-shadow: 0 2px 8px rgba(124, 58, 237, 0.25);
-            letter-spacing: -0.01em;
         }
 
         .submit-btn:hover {
@@ -533,15 +429,11 @@
             box-shadow: 0 4px 16px rgba(124, 58, 237, 0.35);
         }
 
-        .submit-btn:active {
-            transform: translateY(0);
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
 
-        .submit-btn i {
-            font-size: 1.125rem;
-        }
-
-        /* Submit Message Styles */
         .submit-message {
             margin: 1.5rem 0 0 0;
             padding: 1rem 1.5rem;
@@ -551,12 +443,6 @@
             gap: 0.75rem;
             font-size: 0.9375rem;
             font-weight: 500;
-            animation: slideDown 0.3s ease-out;
-        }
-
-        .submit-message i {
-            font-size: 1.25rem;
-            flex-shrink: 0;
         }
 
         .submit-message.success {
@@ -571,38 +457,10 @@
             border: 1px solid #fca5a5;
         }
 
-        .submit-message.info {
-            background: #dbeafe;
-            color: #1e40af;
-            border: 1px solid #93c5fd;
-        }
-
         .submit-message.hidden {
             display: none;
         }
 
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .submit-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none !important;
-        }
-
-        .submit-btn:disabled:hover {
-            box-shadow: 0 2px 8px rgba(124, 58, 237, 0.25);
-        }
-
-        /* Animations */
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -614,132 +472,16 @@
             }
         }
 
-        .form-section {
-            animation: fadeIn 0.3s ease-out;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        .submit-btn:disabled i {
-            animation: spin 1s linear infinite;
-        }
-
-        /* Responsive */
         @media (max-width: 768px) {
             .form-row {
                 grid-template-columns: 1fr;
-                gap: 1.5rem;
             }
-
-            .form-header {
-                padding: 1.75rem 0;
-            }
-
-            .form-header > div {
-                padding: 0 1.5rem;
-            }
-
-            .form-title {
-                font-size: 1.5rem;
-            }
-
-            .integration-form {
-                padding: 2.5rem 1.5rem;
-            }
-
-            .radio-group {
-                flex-direction: column;
-            }
-
-            .radio-label {
-                width: 100%;
-            }
-
-            .integration-subsection {
-                padding: 1.5rem;
-            }
-
-            .metrics-grid {
-                gap: 1rem;
-            }
-
-            .metric-circle {
-                width: 80px;
-                height: 80px;
-            }
-
-            .metric-number {
-                font-size: 1.25rem;
-            }
-
-            .metric-label {
-                font-size: 0.75rem;
-            }
-
-            .slider-labels span {
-                font-size: 0.75rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .form-header {
-                padding: 1.5rem 0;
-            }
-
-            .form-header > div {
-                padding: 0 1rem;
-            }
-
-            .form-title {
-                font-size: 1.375rem;
-            }
-
-            .form-subtitle {
-                font-size: 0.875rem;
-            }
-
-            .integration-form {
-                padding: 2rem 1rem;
-            }
-
-            .form-section {
-                margin-bottom: 2rem;
-                padding-bottom: 2rem;
-            }
-
-            .section-header h2 {
-                font-size: 1.125rem;
-            }
-
-            .form-group input,
-            .form-group select,
-            .form-group textarea {
-                font-size: 0.875rem;
-            }
-
-            .integration-subsection {
-                padding: 1.25rem;
-            }
-        }
-
-        /* Focus visible for accessibility */
-        button:focus-visible,
-        input:focus-visible,
-        textarea:focus-visible,
-        select:focus-visible {
-            outline: 2px solid #7c3aed;
-            outline-offset: 2px;
         }
     </style>
 </head>
 <body>
     <div class="integration-form-container">
         <div class="integration-form-wrapper">
-            <!-- Header -->
             <div class="form-header">
                 <div>
                     <h1 class="form-title">Remote Agent Integration Request</h1>
@@ -749,31 +491,20 @@
 
             <form id="integrationForm" class="integration-form">
                 {% csrf_token %}
-                
-                <!-- Contact Information Section -->
+
                 <section class="form-section">
                     <div class="section-header">
                         <i class="bi bi-person-fill"></i>
                         <h2>Contact Information</h2>
                     </div>
-
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="companyName">
-                                Company Name <span class="required">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                id="companyName"
-                                name="companyName"
-                                placeholder="Your company name"
-                                required
-                            />
+                            <label for="companyName">Company Name <span class="required">*</span></label>
+                            <input type="text" id="companyName" name="companyName" placeholder="Your company name" required />
                         </div>
                     </div>
                 </section>
 
-                <!-- Campaign Configuration Section -->
                 <section class="form-section">
                     <div class="section-header">
                         <i class="bi bi-robot"></i>
@@ -781,9 +512,7 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="campaign">
-                            Campaign Type <span class="required">*</span>
-                        </label>
+                        <label for="campaign">Campaign Type <span class="required">*</span></label>
                         <select id="campaign" name="campaign" required>
                             <option value="">Select Campaign</option>
                             {% for campaign in campaigns %}
@@ -792,52 +521,24 @@
                         </select>
                     </div>
 
-                    <!-- Transfer Quality Settings with Slider -->
                     <div id="transferSettingsContainer" style="display: none;">
                         <div class="form-group">
-                            <label>
-                                Transfer Quality Settings <span class="required">*</span>
-                            </label>
+                            <label>Transfer Quality Settings <span class="required">*</span></label>
                             <div class="slider-container">
-                                <input
-                                    type="range"
-                                    id="qualitySlider"
-                                    class="quality-slider"
-                                    min="0"
-                                    max="3"
-                                    value="1"
-                                    required
-                                />
-                                <div class="slider-labels" id="sliderLabels">
-                                    <!-- Labels will be dynamically inserted -->
-                                </div>
+                                <input type="range" id="qualitySlider" class="quality-slider" min="0" max="0" value="0" required />
+                                <div class="slider-labels" id="sliderLabels"></div>
                             </div>
-
-                            <!-- Transfer Info Box -->
-                            <div id="transferInfoBox" class="transfer-info-box">
-                                <!-- Content will be dynamically inserted -->
-                            </div>
+                            <div id="transferInfoBox" class="transfer-info-box"></div>
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label for="numberOfBots">
-                            Number of Remote Agents <span class="required">*</span>
-                        </label>
-                        <input
-                            type="number"
-                            id="numberOfBots"
-                            name="numberOfBots"
-                            placeholder="e.g., 10"
-                            min="0"
-                            max="1000"
-                            required
-                        />
+                        <label for="numberOfBots">Number of Remote Agents <span class="required">*</span></label>
+                        <input type="number" id="numberOfBots" name="numberOfBots" placeholder="e.g., 10" min="0" max="1000" required />
                         <small class="form-hint">Specify how many concurrent remote agents you need (1-1000)</small>
                     </div>
                 </section>
 
-                <!-- Integration Settings Section -->
                 <section class="form-section">
                     <div class="section-header">
                         <i class="bi bi-hdd-network"></i>
@@ -858,227 +559,100 @@
                         </div>
                     </div>
 
-                    <!-- Primary Dialler Settings -->
                     <div class="integration-subsection">
                         <h3 class="subsection-title">
                             <i class="bi bi-telephone-fill"></i>
                             Primary Dialler Settings
                         </h3>
-
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="primaryIpValidation">
-                                    IP Validation Link <span class="required">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    id="primaryIpValidation"
-                                    name="primaryIpValidation"
-                                    placeholder="e.g., example.com"
-                                    required
-                                />
+                                <label for="primaryIpValidation">IP Validation Link <span class="required">*</span></label>
+                                <input type="text" id="primaryIpValidation" name="primaryIpValidation" placeholder="e.g., example.com" required />
                             </div>
-
                             <div class="form-group">
-                                <label for="primaryAdminLink">
-                                    Admin Link <span class="required">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    id="primaryAdminLink"
-                                    name="primaryAdminLink"
-                                    placeholder="e.g., dialer.com, www.dialer.com, or https://dialer.com"
-                                    required
-                                />
+                                <label for="primaryAdminLink">Admin Link <span class="required">*</span></label>
+                                <input type="text" id="primaryAdminLink" name="primaryAdminLink" placeholder="e.g., dialer.com" required />
                             </div>
                         </div>
-
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="primaryUser">
-                                    Username <span class="required">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    id="primaryUser"
-                                    name="primaryUser"
-                                    placeholder="Admin username"
-                                    required
-                                />
+                                <label for="primaryUser">Username <span class="required">*</span></label>
+                                <input type="text" id="primaryUser" name="primaryUser" placeholder="Admin username" required />
                             </div>
-
                             <div class="form-group">
-                                <label for="primaryPassword">
-                                    Password <span class="required">*</span>
-                                </label>
-                                <input
-                                    type="password"
-                                    id="primaryPassword"
-                                    name="primaryPassword"
-                                    placeholder="Admin password"
-                                    required
-                                />
+                                <label for="primaryPassword">Password <span class="required">*</span></label>
+                                <input type="password" id="primaryPassword" name="primaryPassword" placeholder="Admin password" required />
                             </div>
                         </div>
-
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="primaryBotsCampaign">
-                                    Fronting Campaign
-                                </label>
-                                <input
-                                    type="text"
-                                    id="primaryBotsCampaign"
-                                    name="primaryBotsCampaign"
-                                    placeholder="Enter fronting campaign name (optional)"
-                                />
+                                <label for="primaryBotsCampaign">Fronting Campaign</label>
+                                <input type="text" id="primaryBotsCampaign" name="primaryBotsCampaign" placeholder="Campaign name (optional)" />
                             </div>
-
                             <div class="form-group">
-                                <label for="primaryUserSeries">
-                                    Verifier Campaign
-                                </label>
-                                <input
-                                    type="text"
-                                    id="primaryUserSeries"
-                                    name="primaryUserSeries"
-                                    placeholder="Enter verifier campaign name (optional)"
-                                />
+                                <label for="primaryUserSeries">Verifier Campaign</label>
+                                <input type="text" id="primaryUserSeries" name="primaryUserSeries" placeholder="Campaign name (optional)" />
                             </div>
                         </div>
-
                         <div class="form-group">
-                            <label for="primaryPort">
-                                Port
-                            </label>
-                            <input
-                                type="text"
-                                id="primaryPort"
-                                name="primaryPort"
-                                placeholder="e.g., 7788"
-                            />
+                            <label for="primaryPort">Port</label>
+                            <input type="text" id="primaryPort" name="primaryPort" placeholder="e.g., 7788" />
                         </div>
                     </div>
 
-                    <!-- Separate Closer Dialler Settings (Hidden by default) -->
                     <div id="closerSection" class="integration-subsection closer-section" style="display: none;">
                         <h3 class="subsection-title">
                             <i class="bi bi-diagram-3"></i>
-                            Closer Dialler Settings (Optional)
+                            Closer Dialler Settings
                         </h3>
-
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="closerIpValidation">
-                                    IP Validation Link
-                                </label>
-                                <input
-                                    type="text"
-                                    id="closerIpValidation"
-                                    name="closerIpValidation"
-                                    placeholder="e.g., example.com"
-                                />
+                                <label for="closerIpValidation">IP Validation Link</label>
+                                <input type="text" id="closerIpValidation" name="closerIpValidation" placeholder="e.g., example.com" />
                             </div>
-
                             <div class="form-group">
-                                <label for="closerAdminLink">
-                                    Admin Link
-                                </label>
-                                <input
-                                    type="text"
-                                    id="closerAdminLink"
-                                    name="closerAdminLink"
-                                    placeholder="e.g., closer-dialer.com, www.closer-dialer.com, or https://closer-dialer.com"
-                                />
+                                <label for="closerAdminLink">Admin Link</label>
+                                <input type="text" id="closerAdminLink" name="closerAdminLink" placeholder="e.g., closer-dialer.com" />
                             </div>
                         </div>
-
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="closerUser">
-                                    Username
-                                </label>
-                                <input
-                                    type="text"
-                                    id="closerUser"
-                                    name="closerUser"
-                                    placeholder="Admin username"
-                                />
+                                <label for="closerUser">Username</label>
+                                <input type="text" id="closerUser" name="closerUser" placeholder="Admin username" />
                             </div>
-
                             <div class="form-group">
-                                <label for="closerPassword">
-                                    Password
-                                </label>
-                                <input
-                                    type="password"
-                                    id="closerPassword"
-                                    name="closerPassword"
-                                    placeholder="Admin password"
-                                />
+                                <label for="closerPassword">Password</label>
+                                <input type="password" id="closerPassword" name="closerPassword" placeholder="Admin password" />
                             </div>
                         </div>
-
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="closerCampaign">
-                                    Campaign
-                                </label>
-                                <input
-                                    type="text"
-                                    id="closerCampaign"
-                                    name="closerCampaign"
-                                    placeholder="Closer campaign name"
-                                />
+                                <label for="closerCampaign">Campaign</label>
+                                <input type="text" id="closerCampaign" name="closerCampaign" placeholder="Campaign name" />
                             </div>
-
                             <div class="form-group">
-                                <label for="closerIngroup">
-                                    Ingroup
-                                </label>
-                                <input
-                                    type="text"
-                                    id="closerIngroup"
-                                    name="closerIngroup"
-                                    placeholder="Inbound group name"
-                                />
+                                <label for="closerIngroup">Ingroup</label>
+                                <input type="text" id="closerIngroup" name="closerIngroup" placeholder="Inbound group" />
                             </div>
                         </div>
-
                         <div class="form-group">
-                            <label for="closerPort">
-                                Port
-                            </label>
-                            <input
-                                type="text"
-                                id="closerPort"
-                                name="closerPort"
-                                placeholder="e.g., 7788"
-                            />
+                            <label for="closerPort">Port</label>
+                            <input type="text" id="closerPort" name="closerPort" placeholder="e.g., 7788" />
                         </div>
                     </div>
                 </section>
 
-                <!-- Custom Requirements Section -->
                 <section class="form-section">
                     <div class="section-header">
                         <i class="bi bi-chat-square-text"></i>
                         <h2>Current Remote Agents</h2>
                     </div>
-
                     <div class="form-group">
-                        <label for="customRequirements">
-                            What company's remote agents are you currently using? (Optional)
-                        </label>
-                        <textarea
-                            id="customRequirements"
-                            name="customRequirements"
-                            rows="6"
-                        ></textarea>
+                        <label for="customRequirements">What company's remote agents are you currently using? (Optional)</label>
+                        <textarea id="customRequirements" name="customRequirements" rows="6"></textarea>
                     </div>
                 </section>
 
-                <!-- Submit Button -->
                 <div class="form-actions">
                     <button type="submit" class="submit-btn" id="submitBtn">
                         <i class="bi bi-send-fill"></i>
@@ -1086,7 +660,6 @@
                     </button>
                 </div>
 
-                <!-- Submit Message -->
                 <div id="submitMessage" class="submit-message hidden">
                     <i></i>
                     <span></span>
@@ -1096,51 +669,19 @@
     </div>
 
     <script>
-        // Campaign configuration from backend
         const campaignConfig = {{ campaign_config|safe }};
+        const transferSettings = {{ transfer_settings|safe }};
 
-        // Initialize form data
         let formData = {
             campaign: '',
-            model: '',
+            modelName: '',
+            transferSettingsId: null,
             numberOfBots: '',
-            transferSettings: 'balanced',
             setupType: 'same'
         };
 
-        // Transfer settings data
-        const transferSettingsData = {
-            'quality': {
-                model: 'Advanced Model',
-                title: 'Quality (Recommended)',
-                description: 'This setting focuses on prioritizing higher-quality transfers by connecting only the most relevant and well-qualified calls. It\'s more selective, so the overall number of transfers is typically lower, with a stronger emphasis on quality.',
-                quality: 90,
-                volume: 40
-            },
-            'balanced': {
-                model: 'Basic Model',
-                title: 'Balanced (Recommended)',
-                description: 'This setting offers an even mix of quality and volume, helping maintain a steady flow of transfers without missing potential opportunities. You can expect a healthy balance between well-qualified, mixed, and general calls.',
-                quality: 50,
-                volume: 50
-            },
-            'high-volume': {
-                model: 'Basic Model',
-                title: 'High Volume',
-                description: 'This setting prioritizes higher transfer volume, delivering a medium to high number of transfers. While the overall volume is higher, the mix of call quality may vary, including well-qualified, mixed, and general calls, providing more opportunities at scale.',
-                quality: 40,
-                volume: 80
-            },
-            'max-volume': {
-                model: 'Basic Model',
-                title: 'Max Volume',
-                description: 'This setting focuses on achieving the max number of transfers possible. While it maximizes volume, it also leads to wasted resources and time due to the higher number of low-quality connections.',
-                quality: 30,
-                volume: 100
-            }
-        };
+        let currentTransferSettings = [];
 
-        // Get CSRF token
         function getCookie(name) {
             let cookieValue = null;
             if (document.cookie && document.cookie !== '') {
@@ -1156,98 +697,70 @@
             return cookieValue;
         }
 
-        // Show message function
         function showMessage(type, text) {
             const messageEl = document.getElementById('submitMessage');
             const iconEl = messageEl.querySelector('i');
             const textEl = messageEl.querySelector('span');
-            
+
             messageEl.className = `submit-message ${type}`;
-            
-            if (type === 'success') {
-                iconEl.className = 'bi bi-check-circle-fill';
-            } else if (type === 'error') {
-                iconEl.className = 'bi bi-exclamation-circle-fill';
-            } else if (type === 'info') {
-                iconEl.className = 'bi bi-info-circle-fill';
-            }
-            
+            iconEl.className = type === 'success' ? 'bi bi-check-circle-fill' : 'bi bi-exclamation-circle-fill';
             textEl.textContent = text;
             messageEl.classList.remove('hidden');
-            
-            setTimeout(() => {
-                messageEl.classList.add('hidden');
-            }, 5000);
+
+            setTimeout(() => messageEl.classList.add('hidden'), 5000);
         }
 
-        // Update slider labels
         function updateSliderLabels(campaign) {
-            const models = campaignConfig[campaign] || [];
-            const hasAdvancedOnly = models.length === 1 && models[0] === 'Advanced';
-            const hasBasicOnly = models.length === 1 && models[0] === 'Basic';
+            const models = campaignConfig[campaign] || {};
+            const modelNames = Object.keys(models);
+            
+            if (modelNames.length === 0) return;
+
+            const firstModel = modelNames[0];
+            const transferSettingIds = models[firstModel].map(ts => ts.id);
+            
+            currentTransferSettings = transferSettings
+                .filter(ts => transferSettingIds.includes(ts.id))
+                .sort((a, b) => a.display_order - b.display_order);
+
+            const slider = document.getElementById('qualitySlider');
+            slider.max = currentTransferSettings.length - 1;
+            slider.value = 0;
+
+            formData.transferSettingsId = currentTransferSettings[0].id;
+            formData.modelName = firstModel;
 
             const sliderLabels = document.getElementById('sliderLabels');
-            const slider = document.getElementById('qualitySlider');
-
-            if (hasAdvancedOnly) {
-                slider.max = 3;
-                slider.value = 1;
-                formData.transferSettings = 'balanced';
-                formData.model = 'Advanced';
-                sliderLabels.innerHTML = `
-                    <span class="${formData.transferSettings === 'quality' ? 'active' : ''}">Quality</span>
-                    <span class="${formData.transferSettings === 'balanced' ? 'active' : ''}">Balanced</span>
-                    <span class="${formData.transferSettings === 'high-volume' ? 'active' : ''}">High Volume</span>
-                    <span class="${formData.transferSettings === 'max-volume' ? 'active' : ''}">Max Volume</span>
-                `;
-            } else if (hasBasicOnly) {
-                slider.max = 2;
-                slider.value = 0;
-                formData.transferSettings = 'balanced';
-                formData.model = 'Basic';
-                sliderLabels.innerHTML = `
-                    <span class="${formData.transferSettings === 'balanced' ? 'active' : ''}">Balanced</span>
-                    <span class="${formData.transferSettings === 'high-volume' ? 'active' : ''}">High Volume</span>
-                    <span class="${formData.transferSettings === 'max-volume' ? 'active' : ''}">Max Volume</span>
-                `;
-            } else {
-                slider.max = 3;
-                slider.value = 1;
-                formData.transferSettings = 'balanced';
-                formData.model = models[0] || 'Basic';
-                sliderLabels.innerHTML = `
-                    <span class="${formData.transferSettings === 'quality' ? 'active' : ''}">Quality</span>
-                    <span class="${formData.transferSettings === 'balanced' ? 'active' : ''}">Balanced</span>
-                    <span class="${formData.transferSettings === 'high-volume' ? 'active' : ''}">High Volume</span>
-                    <span class="${formData.transferSettings === 'max-volume' ? 'active' : ''}">Max Volume</span>
-                `;
-            }
+            sliderLabels.innerHTML = currentTransferSettings
+                .map((ts, index) => `<span class="${index === 0 ? 'active' : ''}">${ts.name}</span>`)
+                .join('');
 
             updateTransferInfoBox();
         }
 
-        // Update transfer info box
         function updateTransferInfoBox() {
-            const data = transferSettingsData[formData.transferSettings];
-            if (!data) return;
+            const setting = currentTransferSettings.find(ts => ts.id === formData.transferSettingsId);
+            if (!setting) return;
 
             const infoBox = document.getElementById('transferInfoBox');
             infoBox.innerHTML = `
                 <div class="info-header">
                     <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
-                        <div class="model-tag" style="align-self: flex-start;">${data.model}</div>
-                        <span class="badge" style="align-self: center; margin-top: 12px;">${data.title}</span>
+                        <div class="model-tag" style="align-self: flex-start;">${formData.modelName} Model</div>
+                        <span class="badge ${setting.is_recommended ? 'recommended-badge' : ''}" style="align-self: center; margin-top: 12px;">
+                            ${setting.name}${setting.is_recommended ? ' (Recommended)' : ''}
+                        </span>
                     </div>
                 </div>
-                <p style="margin-top: -30px;">${data.description}</p>
+                <p style="margin-top: -30px;">${setting.description || 'No description available'}</p>
                 <div class="metrics-grid">
                     <div class="metric-card">
                         <div class="metric-circle">
                             <svg viewBox="0 0 36 36" class="circular-chart">
                                 <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                <path class="circle quality" stroke-dasharray="${data.quality}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                <path class="circle quality" stroke-dasharray="${setting.quality_score}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                             </svg>
-                            <div class="metric-number">${data.quality}</div>
+                            <div class="metric-number">${setting.quality_score}</div>
                         </div>
                         <span class="metric-label">Quality</span>
                     </div>
@@ -1255,9 +768,9 @@
                         <div class="metric-circle">
                             <svg viewBox="0 0 36 36" class="circular-chart">
                                 <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                <path class="circle volume" stroke-dasharray="${data.volume}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                <path class="circle volume" stroke-dasharray="${setting.volume_score}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                             </svg>
-                            <div class="metric-number">${data.volume}</div>
+                            <div class="metric-number">${setting.volume_score}</div>
                         </div>
                         <span class="metric-label">Volume</span>
                     </div>
@@ -1265,10 +778,8 @@
             `;
         }
 
-        // Campaign change handler
         document.getElementById('campaign').addEventListener('change', (e) => {
             formData.campaign = e.target.value;
-            
             if (formData.campaign) {
                 document.getElementById('transferSettingsContainer').style.display = 'block';
                 updateSliderLabels(formData.campaign);
@@ -1277,61 +788,39 @@
             }
         });
 
-        // Slider change handler
         document.getElementById('qualitySlider').addEventListener('input', (e) => {
-            const campaign = formData.campaign;
-            const models = campaignConfig[campaign] || [];
-            const hasAdvancedOnly = models.length === 1 && models[0] === 'Advanced';
-            const hasBasicOnly = models.length === 1 && models[0] === 'Basic';
-
-            let values = [];
-            if (hasAdvancedOnly) {
-                values = ['quality', 'balanced', 'high-volume', 'max-volume'];
-                formData.model = 'Advanced';
-            } else if (hasBasicOnly) {
-                values = ['balanced', 'high-volume', 'max-volume'];
-                formData.model = 'Basic';
-            } else {
-                values = ['quality', 'balanced', 'high-volume', 'max-volume'];
-                formData.model = e.target.value === '0' ? 'Advanced' : 'Basic';
-            }
-
-            formData.transferSettings = values[e.target.value];
+            const index = parseInt(e.target.value);
+            formData.transferSettingsId = currentTransferSettings[index].id;
 
             const labels = document.querySelectorAll('#sliderLabels span');
-            labels.forEach((label, index) => {
-                label.className = index == e.target.value ? 'active' : '';
+            labels.forEach((label, i) => {
+                label.className = i === index ? 'active' : '';
             });
 
             updateTransferInfoBox();
         });
 
-        // Setup type change handler
         document.querySelectorAll('input[name="setupType"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
                 formData.setupType = e.target.value;
-                const closerSection = document.getElementById('closerSection');
-                closerSection.style.display = e.target.value === 'separate' ? 'block' : 'none';
+                document.getElementById('closerSection').style.display = e.target.value === 'separate' ? 'block' : 'none';
             });
         });
 
-        // Form submission
         document.getElementById('integrationForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Submitting Request...';
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Submitting...';
 
-            const form = e.target;
-            const formDataObj = new FormData(form);
-            
+            const formDataObj = new FormData(e.target);
             const data = {
                 companyName: formDataObj.get('companyName'),
                 campaign: formData.campaign,
-                model: formData.model,
+                modelName: formData.modelName,
+                transferSettingsId: formData.transferSettingsId,
                 numberOfBots: formDataObj.get('numberOfBots'),
-                transferSettings: formData.transferSettings,
                 setupType: formDataObj.get('setupType'),
                 primaryIpValidation: formDataObj.get('primaryIpValidation'),
                 primaryAdminLink: formDataObj.get('primaryAdminLink'),
@@ -1359,31 +848,23 @@
                     },
                     body: JSON.stringify(data)
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     showMessage('success', result.message + ' Username: ' + result.data.username);
-                    
                     setTimeout(() => {
-                        form.reset();
-                        formData = {
-                            campaign: '',
-                            model: '',
-                            numberOfBots: '',
-                            transferSettings: 'balanced',
-                            setupType: 'same'
-                        };
+                        e.target.reset();
+                        formData = { campaign: '', modelName: '', transferSettingsId: null, numberOfBots: '', setupType: 'same' };
                         document.getElementById('closerSection').style.display = 'none';
                         document.getElementById('transferSettingsContainer').style.display = 'none';
                     }, 3000);
                 } else {
-                    showMessage('error', result.message || 'An error occurred while submitting the form.');
+                    showMessage('error', result.message || 'An error occurred.');
                 }
-                
             } catch (error) {
                 console.error('Error:', error);
-                showMessage('error', 'An error occurred while submitting the form. Please try again.');
+                showMessage('error', 'An error occurred. Please try again.');
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="bi bi-send-fill"></i> Submit Integration Request';

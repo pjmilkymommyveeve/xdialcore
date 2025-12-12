@@ -22,7 +22,8 @@ from campaigns.models import (
     CloserDialer, 
     DialerSettings,
     Status, 
-    StatusHistory
+    StatusHistory,
+    TransferSettings
 )
 
 
@@ -435,33 +436,63 @@ def data_export(request, campaign_id):
     }
     
     return render(request, 'clients/data_export.html', context)
-
-
 def integration_request(request):
     """
     Public integration request form.
-    GET: Display form with dynamic campaign/model data
+    GET: Display form with dynamic transfer settings
     POST: Process form and create all database entries
     """
     if request.method == 'GET':
-        # Fetch all campaigns and models from database
+        # Get all campaigns
         campaigns = Campaign.objects.all().order_by('name')
-        models = Model.objects.all().order_by('name')
         
-        # Build campaign config mapping (campaign -> available models)
+        # Build campaign configuration for JavaScript
+        # This maps campaign names to their available models with transfer settings
         campaign_config = {}
-        for cm in CampaignModel.objects.select_related('campaign', 'model'):
-            campaign_name = cm.campaign.name
-            model_name = cm.model.name
-            if campaign_name not in campaign_config:
-                campaign_config[campaign_name] = []
-            campaign_config[campaign_name].append(model_name)
+        for campaign in campaigns:
+            # Get all unique models available for this campaign with their transfer settings
+            campaign_models = CampaignModel.objects.filter(
+                campaign=campaign
+            ).select_related('model', 'model__transfer_settings').values(
+                'model__name',
+                'model__transfer_settings__id',
+                'model__transfer_settings__name'
+            ).distinct()
+            
+            # Group by model name and collect transfer settings
+            models_dict = {}
+            for cm in campaign_models:
+                model_name = cm['model__name']
+                if model_name not in models_dict:
+                    models_dict[model_name] = []
+                if cm['model__transfer_settings__id']:
+                    models_dict[model_name].append({
+                        'id': cm['model__transfer_settings__id'],
+                        'name': cm['model__transfer_settings__name']
+                    })
+            
+            campaign_config[campaign.name] = models_dict
+        
+        # Get all transfer settings with their properties
+        transfer_settings = TransferSettings.objects.all().order_by('display_order')
+        transfer_settings_data = []
+        for ts in transfer_settings:
+            transfer_settings_data.append({
+                'id': ts.id,
+                'name': ts.name,
+                'description': ts.description or '',
+                'is_recommended': ts.is_recommended,
+                'quality_score': ts.quality_score,
+                'volume_score': ts.volume_score,
+                'display_order': ts.display_order
+            })
         
         context = {
             'campaigns': campaigns,
-            'models': models,
             'campaign_config': json.dumps(campaign_config),
+            'transfer_settings': json.dumps(transfer_settings_data)
         }
+        
         return render(request, 'clients/integration_request.html', context)
     
     elif request.method == 'POST':
@@ -469,31 +500,35 @@ def integration_request(request):
             # Parse JSON data from request body
             data = json.loads(request.body)
             
-            # Validate required fields
-            required_fields = [
-                'companyName', 'campaign', 'model', 'numberOfBots',
-                'primaryIpValidation', 'primaryAdminLink',
-                'primaryUser', 'primaryPassword'
-            ]
-            
-            for field in required_fields:
-                if not data.get(field):
-                    return JsonResponse({
-                        'success': False,
-                        'message': f'Missing required field: {field}'
-                    }, status=400)
-            
             # Start database transaction
             with transaction.atomic():
-                # 1. Create User account with CLIENT role
+                # 1. Create or get unique company name
+                base_company_name = data.get('companyName', '').strip()
+                if not base_company_name:
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'Company name is required'
+                    }, status=400)
+                
+                company_name = base_company_name
+                counter = 1
+                
+                # Check if company name exists and increment if needed
+                while Client.objects.filter(name=company_name).exists():
+                    company_name = f"{counter}{base_company_name}"
+                    counter += 1
+                
+                # 2. Create User with Client role
                 client_role = Role.objects.get(name=Role.CLIENT)
                 
-                # Generate unique username from company name
-                base_username = data['companyName'].lower().replace(' ', '_')
-                username = base_username
+                # Create username from company name (lowercase, no spaces)
+                username = company_name.lower().replace(' ', '_')
+                
+                # Ensure username is unique
+                original_username = username
                 counter = 1
                 while User.objects.filter(username=username).exists():
-                    username = f"{base_username}_{counter}"
+                    username = f"{original_username}{counter}"
                     counter += 1
                 
                 user = User.objects.create(
@@ -503,37 +538,47 @@ def integration_request(request):
                     is_active=True
                 )
                 
-                # 2. Create Client profile
+                # 3. Create Client profile
                 client = Client.objects.create(
                     client=user,
-                    name=data['companyName'],
+                    name=company_name,
                     is_archived=False
                 )
                 
-                # 3. Get or create Campaign
-                campaign, _ = Campaign.objects.get_or_create(
-                    name=data['campaign'],
-                    defaults={'description': f'{data["campaign"]} campaign'}
+                # 4. Get Campaign
+                campaign_name = data.get('campaign')
+                campaign = Campaign.objects.get(name=campaign_name)
+                
+                # 5. Get Transfer Settings and Model based on transfer_settings_id
+                transfer_settings_id = data.get('transferSettingsId')
+                
+                if not transfer_settings_id:
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'Transfer settings selection is required'
+                    }, status=400)
+                
+                transfer_setting = TransferSettings.objects.get(id=transfer_settings_id)
+                
+                # Get the model associated with this transfer setting
+                # The model_name is also sent from frontend for verification
+                model_name = data.get('modelName')
+                model = Model.objects.get(
+                    name=model_name,
+                    transfer_settings=transfer_setting
                 )
                 
-                # 4. Get or create Model
-                model, _ = Model.objects.get_or_create(
-                    name=data['model'],
-                    defaults={
-                        'description': f'{data["model"]} model',
-                        'transfer_settings': data.get('transferSettings', 'balanced')
-                    }
-                )
-                
-                # 5. Get or create CampaignModel association
-                campaign_model, _ = CampaignModel.objects.get_or_create(
+                # 6. Get or create CampaignModel
+                campaign_model = CampaignModel.objects.get(
                     campaign=campaign,
                     model=model
                 )
                 
-                # 6. Create CloserDialer (if separate dialer)
+                # 7. Create CloserDialer (if separate dialer)
                 closer_dialer = None
-                if data.get('setupType') == 'separate':
+                setup_type = data.get('setupType', 'same')
+                
+                if setup_type == 'separate':
                     closer_dialer = CloserDialer.objects.create(
                         ip_validation_link=data.get('closerIpValidation', ''),
                         admin_link=data.get('closerAdminLink', ''),
@@ -544,53 +589,52 @@ def integration_request(request):
                         port=int(data.get('closerPort', 5060))
                     )
                 
-                # 7. Create DialerSettings
+                # 8. Create DialerSettings
                 dialer_settings = DialerSettings.objects.create(
                     closer_dialer=closer_dialer
                 )
                 
-                # 8. Create PrimaryDialer and link to DialerSettings
+                # 9. Create PrimaryDialer and link to DialerSettings
                 primary_dialer = PrimaryDialer.objects.create(
-                    ip_validation_link=data['primaryIpValidation'],
-                    admin_link=data['primaryAdminLink'],
-                    admin_username=data['primaryUser'],
-                    admin_password=data['primaryPassword'],
+                    ip_validation_link=data.get('primaryIpValidation', ''),
+                    admin_link=data.get('primaryAdminLink', ''),
+                    admin_username=data.get('primaryUser', ''),
+                    admin_password=data.get('primaryPassword', ''),
                     fronting_campaign=data.get('primaryBotsCampaign', ''),
                     verifier_campaign=data.get('primaryUserSeries', ''),
                     port=int(data.get('primaryPort', 5060)),
                     dialer_settings=dialer_settings
                 )
                 
-                # 9. Create Status
-                status = Status.objects.create(
-                    status_name='Pending Approval'
-                )
+                # 10. Get Status
+                status, created = Status.objects.get_or_create(status_name='Pending Approval')
                 
-                # 10. Create StatusHistory
+                # 11. Create StatusHistory
                 status_history = StatusHistory.objects.create(
                     status=status,
                     start_date=datetime.now(),
                     end_date=None
                 )
                 
-                # 11. Create ClientCampaignModel (main entry) with campaign requirements
+                # 12. Create ClientCampaignModel (main entry)
+                bot_count = int(data.get('numberOfBots', 0))
+                
                 client_campaign_model = ClientCampaignModel.objects.create(
                     client=client,
                     campaign_model=campaign_model,
                     status_history=status_history,
                     start_date=datetime.now(),
                     end_date=None,
-                    is_custom=bool(data.get('customRequirements')),
-                    custom_comments=data.get('customRequirements', ''),
+                    is_custom=False,
+                    custom_comments='',
                     current_remote_agents=data.get('customRequirements', ''),
                     is_active=False,  # Not active until approved
                     is_enabled=True,
                     is_approved=False,  # Requires admin approval
                     dialer_settings=dialer_settings,
-                    # Campaign requirements fields (moved from separate table)
-                    bot_count=int(data['numberOfBots']),
-                    long_call_scripts_active=False,  # Default to False
-                    disposition_set=False  # Default to False
+                    bot_count=bot_count,
+                    long_call_scripts_active=False,
+                    disposition_set=False
                 )
                 
                 # Return success response
@@ -600,9 +644,32 @@ def integration_request(request):
                     'data': {
                         'username': username,
                         'client_id': client.client_id,
-                        'campaign_id': client_campaign_model.id
+                        'client_name': company_name,
+                        'campaign': campaign_name,
+                        'model': model_name,
+                        'transfer_setting': transfer_setting.name,
+                        'bot_count': bot_count,
+                        'campaign_model_id': client_campaign_model.id
                     }
                 }, status=201)
+        
+        except Campaign.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': 'Selected campaign does not exist'
+            }, status=400)
+        
+        except Model.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': 'Model configuration not found for selected settings'
+            }, status=400)
+        
+        except TransferSettings.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': 'Transfer settings not found'
+            }, status=400)
         
         except Role.DoesNotExist:
             return JsonResponse({

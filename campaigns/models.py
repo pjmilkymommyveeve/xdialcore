@@ -3,6 +3,11 @@ from django.db import models
 
 class TransferSettings(models.Model):
     name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True, null=True)
+    is_recommended = models.BooleanField(default=False)
+    quality_score = models.IntegerField(default=50, help_text="Quality score out of 100")
+    volume_score = models.IntegerField(default=50, help_text="Volume score out of 100")
+    display_order = models.IntegerField(default=0, help_text="Order in which to display (lower = first)")
     
     class Meta:
         db_table = 'transfer_settings'
@@ -10,10 +15,13 @@ class TransferSettings(models.Model):
         verbose_name_plural = 'Transfer Settings'
         indexes = [
             models.Index(fields=['name'], name='idx_transfer_settings_name'),
+            models.Index(fields=['display_order'], name='idx_transfer_settings_order'),
         ]
+        ordering = ['display_order', 'name']
     
     def __str__(self):
         return self.name
+
 
 
 class Model(models.Model):
