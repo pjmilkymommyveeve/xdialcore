@@ -27,12 +27,10 @@ class TransferSettings(models.Model):
 class Model(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    transfer_settings = models.ForeignKey(
+    transfer_settings = models.ManyToManyField(
         TransferSettings,
-        on_delete=models.SET_NULL,
         related_name='models',
-        blank=True,
-        null=True
+        blank=True
     )
     
     class Meta:
@@ -41,13 +39,10 @@ class Model(models.Model):
         verbose_name_plural = 'Models'
         indexes = [
             models.Index(fields=['name'], name='idx_models_name'),
-            models.Index(fields=['transfer_settings'], name='idx_models_transfer_settings'),
         ]
     
     def __str__(self):
         return self.name
-
-
 class Campaign(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)

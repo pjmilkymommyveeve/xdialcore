@@ -63,6 +63,7 @@ class ModelInline(admin.StackedInline):
     extra = 0
     fields = ['name', 'description', 'transfer_settings']
     show_change_link = True
+    filter_horizontal = ['transfer_settings']
 
 
 @admin.register(CampaignModel)
@@ -91,14 +92,19 @@ class CampaignModelAdmin(admin.ModelAdmin):
         if db_field.name == "campaign":
             kwargs["queryset"] = Campaign.objects.order_by('name')
         if db_field.name == "model":
-            kwargs["queryset"] = Model.objects.select_related('transfer_settings').order_by('name')
-            # Customize the display to show model name with transfer settings
+            kwargs["queryset"] = Model.objects.prefetch_related('transfer_settings').order_by('name')
             formfield = super().formfield_for_foreignkey(db_field, request, **kwargs)
-            formfield.label_from_instance = lambda obj: (
-                f"{obj.name} - {obj.transfer_settings.name}" 
-                if obj.transfer_settings 
-                else f"{obj.name} - No Transfer Settings"
-            )
+            
+            def label_with_settings(obj):
+                settings = obj.transfer_settings.all()
+                if settings.exists():
+                    settings_str = ", ".join([ts.name for ts in settings[:3]])
+                    if settings.count() > 3:
+                        settings_str += f" (+{settings.count() - 3} more)"
+                    return f"{obj.name} - {settings_str}"
+                return f"{obj.name} - No Transfer Settings"
+            
+            formfield.label_from_instance = label_with_settings
             return formfield
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
@@ -200,20 +206,23 @@ class CampaignAdmin(admin.ModelAdmin):
 class ModelAdmin(admin.ModelAdmin):
     list_display = ['name', 'description', 'get_transfer_settings']
     search_fields = ['name', 'description']
-    list_filter = ['transfer_settings']
+    filter_horizontal = ['transfer_settings']
 
     def get_transfer_settings(self, obj):
-        return obj.transfer_settings.name if obj.transfer_settings else "Not Set"
+        """Display all transfer settings for this model"""
+        settings = obj.transfer_settings.all()
+        if settings.exists():
+            return ", ".join([ts.name for ts in settings])
+        return "None"
     get_transfer_settings.short_description = 'Transfer Settings'
-    get_transfer_settings.admin_order_field = 'transfer_settings__name'
 
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+    def formfield_for_manytomany(self, db_field, request, **kwargs):
         if db_field.name == "transfer_settings":
-            kwargs["queryset"] = TransferSettings.objects.order_by('name')
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+            kwargs["queryset"] = TransferSettings.objects.order_by('display_order', 'name')
+        return super().formfield_for_manytomany(db_field, request, **kwargs)
 
     def has_module_permission(self, request):
-        return False
+        return True
 
     def has_view_permission(self, request, obj=None):
         if not request.user.is_authenticated:
