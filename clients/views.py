@@ -72,15 +72,26 @@ CATEGORY_MAPPING = {
 
 
 @login_required(login_url='/accounts/login/')
-@role_required([Role.CLIENT])
+@role_required([Role.CLIENT, Role.ONBOARDING, Role.ADMIN])
 def client_landing(request):
     """Client landing page showing their campaigns"""
-    try:
-        client = Client.objects.get(client=request.user)
-    except Client.DoesNotExist:
-        return render(request, 'clients/client_landing.html', {
-            'error': 'Client profile not found. Please contact administrator.'
-        })
+    # For admin/onboarding users, they can view all clients (but this view shows logged-in user's campaigns)
+    if request.user.role.name in [Role.ADMIN, Role.ONBOARDING]:
+        # Admin/onboarding users viewing as themselves - show their campaigns if they have a client profile
+        try:
+            client = Client.objects.get(client=request.user)
+        except Client.DoesNotExist:
+            return render(request, 'clients/client_landing.html', {
+                'error': 'Client profile not found. Please contact administrator.'
+            })
+    else:
+        # Regular client user
+        try:
+            client = Client.objects.get(client=request.user)
+        except Client.DoesNotExist:
+            return render(request, 'clients/client_landing.html', {
+                'error': 'Client profile not found. Please contact administrator.'
+            })
     
     campaigns = ClientCampaignModel.objects.filter(
         client=client,
@@ -133,25 +144,39 @@ def client_landing(request):
 
 
 @login_required(login_url='/accounts/login/')
-@role_required([Role.CLIENT])
+@role_required([Role.CLIENT, Role.ONBOARDING, Role.ADMIN])
 def campaign_dashboard(request, campaign_id):
     """Campaign dashboard showing call records - latest stage only with combined categories"""
-    try:
-        client = Client.objects.get(client=request.user)
-    except Client.DoesNotExist:
-        return render(request, 'clients/campaign_dashboard.html', {
-            'error': 'Client profile not found. Please contact administrator.'
-        })
-    
-    campaign = get_object_or_404(
-        ClientCampaignModel.objects.select_related(
-            'campaign_model__campaign',
-            'campaign_model__model',
-        ),
-        id=campaign_id,
-        client=client,
-        is_enabled=True
-    )
+    # For admin/onboarding users, skip client validation
+    if request.user.role.name in [Role.ADMIN, Role.ONBOARDING]:
+        campaign = get_object_or_404(
+            ClientCampaignModel.objects.select_related(
+                'campaign_model__campaign',
+                'campaign_model__model',
+                'client',
+            ),
+            id=campaign_id,
+            is_enabled=True
+        )
+        client = campaign.client
+    else:
+        # For client users, validate they own this campaign
+        try:
+            client = Client.objects.get(client=request.user)
+        except Client.DoesNotExist:
+            return render(request, 'clients/campaign_dashboard.html', {
+                'error': 'Client profile not found. Please contact administrator.'
+            })
+        
+        campaign = get_object_or_404(
+            ClientCampaignModel.objects.select_related(
+                'campaign_model__campaign',
+                'campaign_model__model',
+            ),
+            id=campaign_id,
+            client=client,
+            is_enabled=True
+        )
     
     # Get filter parameters
     search_query = request.GET.get('search', '').strip()
@@ -354,30 +379,43 @@ def campaign_dashboard(request, campaign_id):
     
     return render(request, 'clients/campaign_dashboard.html', context)
 
-
 @login_required(login_url='/accounts/login/')
-@role_required([Role.CLIENT])
+@role_required([Role.CLIENT, Role.ONBOARDING, Role.ADMIN])
 def campaign_recordings(request, campaign_id):
     """
     Recordings page - provides server configs for client-side fetching.
     Frontend will call backend API endpoint which fetches from recording servers.
     """
-    try:
-        client = Client.objects.get(client=request.user)
-    except Client.DoesNotExist:
-        return render(request, 'clients/campaign_recordings.html', {
-            'error': 'Client profile not found. Please contact administrator.'
-        })
-    
-    campaign = get_object_or_404(
-        ClientCampaignModel.objects.select_related(
-            'campaign_model__campaign',
-            'campaign_model__model',
-        ).prefetch_related('server_bots__server', 'server_bots__extension'),
-        id=campaign_id,
-        client=client,
-        is_enabled=True
-    )
+    # For admin/onboarding users, skip client validation
+    if request.user.role.name in [Role.ADMIN, Role.ONBOARDING]:
+        campaign = get_object_or_404(
+            ClientCampaignModel.objects.select_related(
+                'campaign_model__campaign',
+                'campaign_model__model',
+                'client',
+            ).prefetch_related('server_bots__server', 'server_bots__extension'),
+            id=campaign_id,
+            is_enabled=True
+        )
+        client = campaign.client
+    else:
+        # For client users, validate they own this campaign
+        try:
+            client = Client.objects.get(client=request.user)
+        except Client.DoesNotExist:
+            return render(request, 'clients/campaign_recordings.html', {
+                'error': 'Client profile not found. Please contact administrator.'
+            })
+        
+        campaign = get_object_or_404(
+            ClientCampaignModel.objects.select_related(
+                'campaign_model__campaign',
+                'campaign_model__model',
+            ).prefetch_related('server_bots__server', 'server_bots__extension'),
+            id=campaign_id,
+            client=client,
+            is_enabled=True
+        )
     
     # Get all servers and extensions connected to this campaign
     server_configs = []
@@ -404,25 +442,39 @@ def campaign_recordings(request, campaign_id):
 
 
 @login_required(login_url='/accounts/login/')
-@role_required([Role.CLIENT])
+@role_required([Role.CLIENT, Role.ONBOARDING, Role.ADMIN])
 def data_export(request, campaign_id):
-    """Data export page"""
-    try:
-        client = Client.objects.get(client=request.user)
-    except Client.DoesNotExist:
-        return render(request, 'clients/data_export.html', {
-            'error': 'Client profile not found. Please contact administrator.'
-        })
-    
-    campaign = get_object_or_404(
-        ClientCampaignModel.objects.select_related(
-            'campaign_model__campaign',
-            'campaign_model__model',
-        ),
-        id=campaign_id,
-        client=client,
-        is_enabled=True
-    )
+    """Data export page with combined category mapping"""
+    # For admin/onboarding users, skip client validation
+    if request.user.role.name in [Role.ADMIN, Role.ONBOARDING]:
+        campaign = get_object_or_404(
+            ClientCampaignModel.objects.select_related(
+                'campaign_model__campaign',
+                'campaign_model__model',
+                'client',
+            ),
+            id=campaign_id,
+            is_enabled=True
+        )
+        client = campaign.client
+    else:
+        # For client users, validate they own this campaign
+        try:
+            client = Client.objects.get(client=request.user)
+        except Client.DoesNotExist:
+            return render(request, 'clients/data_export.html', {
+                'error': 'Client profile not found. Please contact administrator.'
+            })
+        
+        campaign = get_object_or_404(
+            ClientCampaignModel.objects.select_related(
+                'campaign_model__campaign',
+                'campaign_model__model',
+            ),
+            id=campaign_id,
+            client=client,
+            is_enabled=True
+        )
     
     if request.method == 'POST':
         export_data_json = request.POST.get('export_data', '{}')
@@ -437,9 +489,21 @@ def data_export(request, campaign_id):
         if list_ids:
             calls = calls.filter(list_id__in=list_ids)
         
-        categories = export_data.get('categories', [])
-        if categories:
-            calls = calls.filter(response_category__id__in=categories)
+        # Handle combined categories - map back to original category names
+        selected_combined_categories = export_data.get('categories', [])
+        if selected_combined_categories:
+            # Find all original category names that map to selected combined categories
+            original_category_ids = []
+            for db_category in ResponseCategory.objects.all():
+                original_name = db_category.name or 'UNKNOWN'
+                combined_name = CATEGORY_MAPPING.get(original_name, original_name)
+                
+                # Check if this category's combined name is in the selected list
+                if combined_name in selected_combined_categories:
+                    original_category_ids.append(db_category.id)
+            
+            if original_category_ids:
+                calls = calls.filter(response_category__id__in=original_category_ids)
         
         start_date = export_data.get('start_date')
         start_time = export_data.get('start_time')
@@ -474,11 +538,15 @@ def data_export(request, campaign_id):
         ])
         
         for call in calls:
+            # Map original category to combined category name
+            original_category_name = call.response_category.name if call.response_category else 'Unknown'
+            combined_category_name = CATEGORY_MAPPING.get(original_category_name, original_category_name)
+            
             writer.writerow([
                 call.id,
                 call.number,
                 call.list_id or '',
-                call.response_category.name.capitalize() if call.response_category else 'Unknown',
+                combined_category_name.capitalize(),
                 call.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                 'Yes' if call.transferred else 'No',
                 call.stage or 0,
@@ -488,12 +556,16 @@ def data_export(request, campaign_id):
         
         return response
     
-    # GET request - display form
+    # GET request - display form with combined categories
     list_ids = Call.objects.filter(
         client_campaign_model=campaign,
         list_id__isnull=False
     ).exclude(list_id='').values_list('list_id', flat=True).distinct().order_by('list_id')
     
+    # Get all categories from database
+    all_db_categories = ResponseCategory.objects.all()
+    
+    # Get call counts per original category
     category_counts_raw = Call.objects.filter(
         client_campaign_model=campaign
     ).values(
@@ -501,17 +573,33 @@ def data_export(request, campaign_id):
         'response_category__name'
     ).annotate(count=Count('id'))
     
-    all_categories = []
+    # Create a dictionary for quick lookup of counts
     category_count_dict = {
         item['response_category__name'] or 'UNKNOWN': item['count'] 
         for item in category_counts_raw
     }
     
-    for category in ResponseCategory.objects.all().order_by('name'):
+    # Combine categories according to mapping
+    combined_counts = {}
+    
+    for db_cat in all_db_categories:
+        original_name = db_cat.name or 'UNKNOWN'
+        combined_name = CATEGORY_MAPPING.get(original_name, original_name)
+        count = category_count_dict.get(original_name, 0)
+        
+        # Accumulate counts for combined categories
+        if combined_name in combined_counts:
+            combined_counts[combined_name] += count
+        else:
+            combined_counts[combined_name] = count
+    
+    # Build the all_categories list with combined categories
+    all_categories = []
+    for combined_name, count in sorted(combined_counts.items()):
         all_categories.append({
-            'id': category.id,
-            'name': category.name.capitalize(),
-            'count': category_count_dict.get(category.name, 0)
+            'name': combined_name.capitalize(),
+            'combined_name': combined_name,  # For form submission
+            'count': count
         })
     
     context = {
@@ -526,6 +614,7 @@ def data_export(request, campaign_id):
     }
     
     return render(request, 'clients/data_export.html', context)
+
 def integration_request(request):
     """
     Public integration request form.

@@ -2,6 +2,8 @@ from django.contrib import admin
 from django import forms
 from django.utils import timezone
 from django.db import transaction
+from django.urls import reverse
+from django.utils.html import format_html
 from .models import (
     TransferSettings,
     Model,
@@ -582,9 +584,38 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
     inlines = [ServerCampaignBotsInline]
     readonly_fields = ['status_history']
     
-    list_display = ['id', 'get_client_name', 'get_campaign', 'get_model', 'is_active', 'is_enabled', 'is_approved', 'bot_count', 'start_date']
-    list_filter = ['is_active', 'is_enabled', 'is_approved', 'is_custom', 'long_call_scripts_active', 'disposition_set', 'start_date']
-    search_fields = ['id', 'client__name', 'campaign_model__campaign__name', 'campaign_model__model__name']
+    list_display = [
+        'id', 
+        'get_client_name', 
+        'get_campaign', 
+        'get_model', 
+        'is_active', 
+        'is_enabled', 
+        'is_approved', 
+        'bot_count', 
+        'start_date',
+        'view_dashboard_link'
+    ]
+    list_filter = [
+        'is_active', 
+        'is_enabled', 
+        'is_approved', 
+        'is_custom', 
+        'long_call_scripts_active', 
+        'disposition_set', 
+        'start_date',
+        'campaign_model__campaign',
+        'campaign_model__model',
+        'client'
+    ]
+    search_fields = [
+        'id', 
+        'client__name', 
+        'campaign_model__campaign__name', 
+        'campaign_model__model__name',
+        'campaign_model__campaign__description',
+        'custom_comments'
+    ]
     date_hierarchy = 'start_date'
     list_select_related = ['client__client', 'campaign_model__campaign', 'campaign_model__model']
     
@@ -622,6 +653,15 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
         return obj.campaign_model.model.name
     get_model.short_description = 'Model'
     get_model.admin_order_field = 'campaign_model__model__name'
+
+    def view_dashboard_link(self, obj):
+        """Display link to campaign dashboard for admin and onboarding users"""
+        url = reverse('clients:campaign_dashboard', args=[obj.id])
+        return format_html(
+            '<a href="{}" target="_blank" style="color: #417690; font-weight: bold;">View Dashboard</a>',
+            url
+        )
+    view_dashboard_link.short_description = 'Dashboard'
 
     def has_module_permission(self, request):
         if not request.user.is_authenticated:
@@ -677,24 +717,4 @@ class ServerCampaignBotsAdmin(admin.ModelAdmin):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def has_module_permission(self, request):
-        return False
-
-    def has_view_permission(self, request, obj=None):
-        if not request.user.is_authenticated:
-            return False
-        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
-
-    def has_add_permission(self, request):
-        if not request.user.is_authenticated:
-            return False
-        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
-
-    def has_change_permission(self, request, obj=None):
-        if not request.user.is_authenticated:
-            return False
-        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
-
-    def has_delete_permission(self, request, obj=None):
-        if not request.user.is_authenticated:
-            return False
-        return request.user.is_superuser or request.user.is_admin
+        return
