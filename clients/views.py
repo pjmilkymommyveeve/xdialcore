@@ -2,7 +2,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404
 import logging
 from django.http import JsonResponse, HttpResponse
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Max
 from core.decorators import role_required
 from django.contrib.auth.hashers import make_password   
 from accounts.models import Role
@@ -197,7 +197,7 @@ def campaign_dashboard(request, campaign_id):
             latest_calls_by_number = Call.objects.filter(
                 client_campaign_model=campaign
             ).values('number').annotate(
-                max_stage=max('stage')
+                max_stage=Max('stage')
             )
             
             # Build a dict for quick lookup
