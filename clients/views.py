@@ -519,7 +519,7 @@ def campaign_recordings(request, campaign_id):
 @login_required(login_url='/accounts/login/')
 @role_required([Role.CLIENT, Role.ONBOARDING, Role.ADMIN])
 def data_export(request, campaign_id):
-    """Data export page with combined category mapping"""
+    """Data export page with combined category mapping - FIXED VERSION"""
     # For admin/onboarding users, skip client validation
     if request.user.role.name in [Role.ADMIN, Role.ONBOARDING]:
         campaign = get_object_or_404(
@@ -555,6 +555,14 @@ def data_export(request, campaign_id):
         export_data_json = request.POST.get('export_data', '{}')
         export_data = json.loads(export_data_json)
         
+        # Get latest stage for each number (same logic as dashboard)
+        latest_calls_by_number = Call.objects.filter(
+            client_campaign_model=campaign
+        ).values('number').annotate(
+            max_stage=Max('stage')
+        )
+        latest_stages = {item['number']: item['max_stage'] for item in latest_calls_by_number}
+        
         calls = Call.objects.filter(
             client_campaign_model=campaign
         ).select_related('response_category', 'voice')
@@ -564,17 +572,21 @@ def data_export(request, campaign_id):
         if list_ids:
             calls = calls.filter(list_id__in=list_ids)
         
-        # Handle combined categories - map back to original category names
+        # Handle combined categories - FIXED VERSION with case-insensitive matching
         selected_combined_categories = export_data.get('categories', [])
         if selected_combined_categories:
+            # Convert selected categories to lowercase for comparison
+            selected_lower = [cat.lower().strip() for cat in selected_combined_categories]
+            
             # Find all original category names that map to selected combined categories
             original_category_ids = []
             for db_category in ResponseCategory.objects.all():
-                original_name = db_category.name or 'UNKNOWN'
+                original_name = (db_category.name or 'UNKNOWN').lower().strip()
+                # Get the combined name from mapping (lowercase key)
                 combined_name = CATEGORY_MAPPING.get(original_name, original_name)
                 
-                # Check if this category's combined name is in the selected list
-                if combined_name in selected_combined_categories:
+                # Case-insensitive comparison
+                if combined_name.lower().strip() in selected_lower:
                     original_category_ids.append(db_category.id)
             
             if original_category_ids:
@@ -601,6 +613,12 @@ def data_export(request, campaign_id):
                 end_datetime = datetime.combine(end_datetime.date(), datetime.max.time())
             calls = calls.filter(timestamp__lte=end_datetime)
         
+        # Filter to latest stage only (same as dashboard)
+        filtered_calls = []
+        for call in calls:
+            if call.number in latest_stages and call.stage == latest_stages[call.number]:
+                filtered_calls.append(call)
+        
         # Create CSV
         response = HttpResponse(content_type='text/csv')
         filename = f"call_data_{campaign.campaign_model.campaign.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
@@ -612,10 +630,14 @@ def data_export(request, campaign_id):
             'Transferred', 'Stage', 'Voice', 'Transcription'
         ])
         
-        for call in calls:
+        for call in filtered_calls:
             # Map original category to combined category name
             original_category_name = call.response_category.name if call.response_category else 'Unknown'
-            combined_category_name = CATEGORY_MAPPING.get(original_category_name, original_category_name)
+            # Use lowercase for lookup in mapping
+            combined_category_name = CATEGORY_MAPPING.get(
+                original_category_name.lower() if original_category_name else 'unknown',
+                original_category_name
+            )
             
             writer.writerow([
                 call.id,
@@ -637,28 +659,39 @@ def data_export(request, campaign_id):
         list_id__isnull=False
     ).exclude(list_id='').values_list('list_id', flat=True).distinct().order_by('list_id')
     
+    # Get latest stage for each number for accurate counts
+    latest_calls_by_number = Call.objects.filter(
+        client_campaign_model=campaign
+    ).values('number').annotate(
+        max_stage=Max('stage')
+    )
+    latest_stages = {item['number']: item['max_stage'] for item in latest_calls_by_number}
+    
     # Get all categories from database
     all_db_categories = ResponseCategory.objects.all()
     
-    # Get call counts per original category
-    category_counts_raw = Call.objects.filter(
+    # Get call counts per original category (ONLY LATEST STAGE)
+    all_calls = Call.objects.filter(
         client_campaign_model=campaign
-    ).values(
-        'response_category__id',
-        'response_category__name'
-    ).annotate(count=Count('id'))
+    ).select_related('response_category')
     
-    # Create a dictionary for quick lookup of counts
-    category_count_dict = {
-        item['response_category__name'] or 'UNKNOWN': item['count'] 
-        for item in category_counts_raw
-    }
+    # Filter to latest stage only
+    latest_stage_calls = [
+        call for call in all_calls
+        if call.number in latest_stages and call.stage == latest_stages[call.number]
+    ]
+    
+    # Count categories from latest stage calls
+    category_count_dict = {}
+    for call in latest_stage_calls:
+        cat_name = (call.response_category.name or 'UNKNOWN').lower().strip()
+        category_count_dict[cat_name] = category_count_dict.get(cat_name, 0) + 1
     
     # Combine categories according to mapping
     combined_counts = {}
     
     for db_cat in all_db_categories:
-        original_name = db_cat.name or 'UNKNOWN'
+        original_name = (db_cat.name or 'UNKNOWN').lower().strip()
         combined_name = CATEGORY_MAPPING.get(original_name, original_name)
         count = category_count_dict.get(original_name, 0)
         
@@ -689,6 +722,7 @@ def data_export(request, campaign_id):
     }
     
     return render(request, 'clients/data_export.html', context)
+
 
 def integration_request(request):
     """
