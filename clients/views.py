@@ -43,7 +43,8 @@ CATEGORY_MAPPING =  {
     "dnq": "Do Not Qualify",
     "qualified": "Qualified",
     "neutral": "Neutral",
-    "repeatpitch": "Repeat Pitch"
+    "repeatpitch": "Repeat Pitch",
+    "unknown": "Unknown"
 }
 
 
