@@ -523,7 +523,7 @@ def data_export(request, campaign_id):
     logger.info(f"=== DATA EXPORT START === User: {request.user.username}, Campaign: {campaign_id}, Method: {request.method}")
     
     try:
-        # For admin/onboarding users, skip client validation
+        # Get campaign and client (existing code)
         if request.user.role.name in [Role.ADMIN, Role.ONBOARDING]:
             logger.debug(f"Admin/Onboarding user access for campaign {campaign_id}")
             campaign = get_object_or_404(
@@ -537,7 +537,6 @@ def data_export(request, campaign_id):
             )
             client = campaign.client
         else:
-            # For client users, validate they own this campaign
             logger.debug(f"Client user access for campaign {campaign_id}")
             try:
                 client = Client.objects.get(client=request.user)
@@ -574,7 +573,7 @@ def data_export(request, campaign_id):
             export_data = json.loads(export_data_json)
             logger.debug(f"Parsed export data: {export_data}")
             
-            # Get latest stage for each number (same logic as dashboard)
+            # Get latest stage for each number
             logger.info("Fetching latest stages...")
             latest_calls_by_number = Call.objects.filter(
                 client_campaign_model=campaign
@@ -589,42 +588,42 @@ def data_export(request, campaign_id):
             ).select_related('response_category', 'voice')
             
             logger.info("Applying filters...")
-            # Apply filters
+            
+            # Apply list ID filter
             list_ids = export_data.get('list_ids', [])
             if list_ids:
                 logger.debug(f"Filtering by list_ids: {list_ids}")
                 calls = calls.filter(list_id__in=list_ids)
             
-            # Handle combined categories - FIXED VERSION with case-insensitive matching
+            # ✅ FIXED: Handle combined categories properly using combined_name
             selected_combined_categories = export_data.get('categories', [])
             if selected_combined_categories:
-                logger.debug(f"Selected categories: {selected_combined_categories}")
-                # Convert selected categories to lowercase for comparison
-                selected_lower = [cat.lower().strip() for cat in selected_combined_categories]
-                logger.debug(f"Normalized selected categories: {selected_lower}")
+                logger.debug(f"Selected combined categories: {selected_combined_categories}")
+                
+                # Build reverse mapping: combined_name -> [original_names]
+                reverse_mapping = {}
+                for original_name, combined_name in CATEGORY_MAPPING.items():
+                    if combined_name not in reverse_mapping:
+                        reverse_mapping[combined_name] = []
+                    reverse_mapping[combined_name].append(original_name)
                 
                 # Find all original category names that map to selected combined categories
-                original_category_ids = []
-                all_db_categories = ResponseCategory.objects.all()
-                logger.debug(f"Total DB categories: {all_db_categories.count()}")
+                original_category_names = []
+                for selected_combined in selected_combined_categories:
+                    # Handle both mapped and unmapped categories
+                    if selected_combined in reverse_mapping:
+                        original_category_names.extend(reverse_mapping[selected_combined])
+                    else:
+                        # Category not in mapping, use as-is
+                        original_category_names.append(selected_combined)
                 
-                for db_category in all_db_categories:
-                    original_name = (db_category.name or 'UNKNOWN').lower().strip()
-                    # Get the combined name from mapping (lowercase key)
-                    combined_name = CATEGORY_MAPPING.get(original_name, original_name)
-                    
-                    logger.debug(f"Checking category: DB={db_category.name}, normalized={original_name}, mapped={combined_name}")
-                    
-                    # Case-insensitive comparison
-                    if combined_name.lower().strip() in selected_lower:
-                        original_category_ids.append(db_category.id)
-                        logger.debug(f"✓ MATCHED category: {db_category.name} (ID: {db_category.id}) -> {combined_name}")
+                logger.info(f"Matched original category names: {original_category_names}")
                 
-                logger.info(f"Matched {len(original_category_ids)} category IDs: {original_category_ids}")
-                if original_category_ids:
-                    calls = calls.filter(response_category__id__in=original_category_ids)
+                if original_category_names:
+                    calls = calls.filter(response_category__name__in=original_category_names)
                     logger.info(f"Filtered calls count after category filter: {calls.count()}")
             
+            # Apply date filters
             start_date = export_data.get('start_date')
             start_time = export_data.get('start_time')
             end_date = export_data.get('end_date')
@@ -658,7 +657,7 @@ def data_export(request, campaign_id):
             
             logger.info(f"Total calls before latest stage filter: {calls.count()}")
             
-            # Filter to latest stage only (same as dashboard)
+            # Filter to latest stage only
             logger.info("Filtering to latest stage only...")
             filtered_calls = []
             for call in calls:
@@ -685,9 +684,8 @@ def data_export(request, campaign_id):
             for call in filtered_calls:
                 # Map original category to combined category name
                 original_category_name = call.response_category.name if call.response_category else 'Unknown'
-                # Use lowercase for lookup in mapping
                 combined_category_name = CATEGORY_MAPPING.get(
-                    original_category_name.lower().strip() if original_category_name else 'unknown',
+                    original_category_name,
                     original_category_name
                 )
                 
@@ -780,7 +778,7 @@ def data_export(request, campaign_id):
         category_count_dict = {}
         for call in latest_stage_calls:
             if call.response_category:
-                cat_name = (call.response_category.name or 'UNKNOWN').lower().strip()
+                cat_name = call.response_category.name or 'UNKNOWN'
                 category_count_dict[cat_name] = category_count_dict.get(cat_name, 0) + 1
         
         logger.debug(f"Category counts (raw): {category_count_dict}")
@@ -790,7 +788,7 @@ def data_export(request, campaign_id):
         combined_counts = {}
         
         for db_cat in all_db_categories:
-            original_name = (db_cat.name or 'UNKNOWN').lower().strip()
+            original_name = db_cat.name or 'UNKNOWN'
             combined_name = CATEGORY_MAPPING.get(original_name, original_name)
             count = category_count_dict.get(original_name, 0)
             
@@ -804,12 +802,12 @@ def data_export(request, campaign_id):
         
         logger.debug(f"Combined counts: {combined_counts}")
         
-        # Build the all_categories list with combined categories
+        # ✅ FIXED: Build all_categories with proper combined_name for form submission
         all_categories = []
         for combined_name, count in sorted(combined_counts.items()):
             all_categories.append({
                 'name': combined_name.capitalize(),
-                'combined_name': combined_name,  # For form submission
+                'combined_name': combined_name,  # This is what gets sent to backend
                 'count': count
             })
         
@@ -825,7 +823,7 @@ def data_export(request, campaign_id):
             },
             'list_ids': list(list_ids),
             'all_categories': all_categories,
-            'total_records': len(latest_stage_calls),  # Add this for template
+            'total_records': len(latest_stage_calls),
         }
         
         logger.info(f"Rendering data_export.html with {len(list_ids)} list_ids and {len(all_categories)} categories")

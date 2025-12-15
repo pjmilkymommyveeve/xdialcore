@@ -197,8 +197,12 @@
                         <div class="checkbox-group" id="categoriesContainer">
                             {% for category in all_categories %}
                             <div class="checkbox-item">
-                                <input type="checkbox" class="checkbox category-checkbox" id="cat-{{ category.id }}" value="{{ category.id }}">
-                                <label for="cat-{{ category.id }}" style="font-size: 0.875rem; cursor: pointer;">
+                                <!-- ✅ FIXED: Use combined_name as value -->
+                                <input type="checkbox" class="checkbox category-checkbox" 
+                                       id="cat-{{ forloop.counter }}" 
+                                       value="{{ category.combined_name }}"
+                                       data-count="{{ category.count }}">
+                                <label for="cat-{{ forloop.counter }}" style="font-size: 0.875rem; cursor: pointer;">
                                     {{ category.name }} ({{ category.count }})
                                 </label>
                             </div>
@@ -218,12 +222,16 @@
                     <div class="card-content" style="display: flex; flex-direction: column; gap: 1rem;">
                         <div>
                             <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                                <span style="font-size: 0.875rem; color: #6b7280;">Total Records:</span>
-                                <span style="font-weight: 500;" id="total-records">0</span>
+                                <span style="font-size: 0.875rem; color: #6b7280;">Total Records Available:</span>
+                                <span style="font-weight: 500;">{{ total_records|default:0 }}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span style="font-size: 0.875rem; color: #6b7280;">Selected Records:</span>
+                                <span style="font-weight: 500;" id="selected-records">{{ total_records|default:0 }}</span>
                             </div>
                             <div style="display: flex; justify-content: space-between;">
                                 <span style="font-size: 0.875rem; color: #6b7280;">Estimated Size:</span>
-                                <span style="font-weight: 500;" id="estimated-size">0 MB</span>
+                                <span style="font-weight: 500;" id="estimated-size">0 KB</span>
                             </div>
                         </div>
                     </div>
@@ -248,9 +256,9 @@
                     </div>
                     <div class="card-content" style="background-color: #f9fafb; font-size: 0.875rem; color: #6b7280;">
                         <p style="margin-bottom: 0.5rem;">• CSV files include all call details</p>
-                        <p style="margin-bottom: 0.5rem;">• Large exports may take a few moments</p>
+                        <p style="margin-bottom: 0.5rem;">• Only latest stage per number is exported</p>
                         <p style="margin-bottom: 0.5rem;">• Files are automatically named with the current date</p>
-                        <p>• Only your call data will be exported</p>
+                        <p>• Categories are combined for clarity</p>
                     </div>
                 </div>
             </div>
@@ -258,41 +266,51 @@
     </main>
 
     <script>
-        // State management
+        // ✅ FIXED: Proper state management with accurate counting
+        const totalAvailableRecords = {{ total_records|default:0 }};
+        
         const state = {
             selectedLists: new Set(),
             selectedCategories: new Set(),
+            categoryRecords: {},  // Store record counts per category
             startDate: '',
             startTime: '',
             endDate: '',
             endTime: ''
         };
 
-        // Calculate total based on filters (mock calculation)
+        // ✅ Initialize category record counts from checkboxes
+        document.querySelectorAll('.category-checkbox').forEach(checkbox => {
+            state.categoryRecords[checkbox.value] = parseInt(checkbox.dataset.count) || 0;
+        });
+
+        // ✅ Calculate accurate selected records based on filters
+        function calculateSelectedRecords() {
+            // If no categories selected, assume all categories
+            if (state.selectedCategories.size === 0) {
+                return totalAvailableRecords;
+            }
+            
+            // Sum up counts from selected categories
+            let total = 0;
+            state.selectedCategories.forEach(catName => {
+                total += state.categoryRecords[catName] || 0;
+            });
+            
+            return total;
+        }
+
+        // Update summary display
         function updateSummary() {
-            const totalCategories = '{{ all_categories|length }}';
-            const totalLists = '{{ list_ids|length }}';
+            const selectedRecords = calculateSelectedRecords();
+            const estimatedSize = (selectedRecords * 0.5).toFixed(2); // ~0.5KB per record
             
-            let categoryCount = state.selectedCategories.size;
-            let listCount = state.selectedLists.size;
-            
-            if (categoryCount === 0) categoryCount = totalCategories;
-            if (listCount === 0) listCount = totalLists;
-            
-            // Mock calculation - replace with actual backend calculation
-            const estimatedRecords = categoryCount * listCount * 150; // Average 150 records per list/category combo
-            const estimatedSize = (estimatedRecords * 0.5 / 1000).toFixed(2); // ~0.5KB per record
-            
-            document.getElementById('total-records').textContent = estimatedRecords.toLocaleString();
-            document.getElementById('estimated-size').textContent = estimatedSize + ' MB';
+            document.getElementById('selected-records').textContent = selectedRecords.toLocaleString();
+            document.getElementById('estimated-size').textContent = estimatedSize + ' KB';
             
             // Enable/disable export button
             const exportBtn = document.getElementById('exportBtn');
-            if (estimatedRecords > 0) {
-                exportBtn.disabled = false;
-            } else {
-                exportBtn.disabled = true;
-            }
+            exportBtn.disabled = selectedRecords === 0;
         }
 
         // Select All Lists
@@ -395,12 +413,14 @@
             const exportData = {
                 campaign_id: '{{ campaign.id }}',
                 list_ids: Array.from(state.selectedLists),
-                categories: Array.from(state.selectedCategories),
+                categories: Array.from(state.selectedCategories),  // ✅ Now sends combined_name values
                 start_date: state.startDate,
                 start_time: state.startTime,
                 end_date: state.endDate,
                 end_time: state.endTime
             };
+            
+            console.log('Export data:', exportData);  // Debug logging
             
             // Create form and submit
             const form = document.createElement('form');
