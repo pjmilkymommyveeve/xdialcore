@@ -121,242 +121,367 @@ def client_landing(request):
     return render(request, 'clients/client_landing.html', context)
 
 
+import logging
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse
+from django.db.models import Count, Q, Max
+from core.decorators import role_required
+from accounts.models import Role
+from .models import Client
+from campaigns.models import ClientCampaignModel, ResponseCategory
+from calls.models import Call
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+# Edit this only |
+CATEGORY_MAPPING = {
+    "greetingresponse": "Greeting Response",
+    "notfeelinggood": "Not Feeling Good",
+    "dnc": "Do Not Call",
+    "honeypot_hardcoded": "Honeypot",
+    "honeypot": "Honeypot",
+    "spanishanswermachine": "Spanish Answering Machine",
+    "answermachine": "Answering Machine",
+    "already": "Already Customer",
+    "rebuttal": "Rebuttal",
+    "notinterested": "Not Interested",
+    "busy": "Busy",
+    "dnq": "Do Not Qualify",
+    "qualified": "Qualified",
+    "neutral": "Neutral",
+    "repeatpitch": "Repeat Pitch"
+}
+
+
 @login_required(login_url='/accounts/login/')
 @role_required([Role.CLIENT, Role.ONBOARDING, Role.ADMIN])
 def campaign_dashboard(request, campaign_id):
     """Campaign dashboard showing call records - latest stage only with combined categories"""
-    # For admin/onboarding users, skip client validation
-    if request.user.role.name in [Role.ADMIN, Role.ONBOARDING]:
-        campaign = get_object_or_404(
-            ClientCampaignModel.objects.select_related(
-                'campaign_model__campaign',
-                'campaign_model__model',
-                'client',
-            ),
-            id=campaign_id,
-            is_enabled=True
-        )
-        client = campaign.client
-    else:
-        # For client users, validate they own this campaign
+    try:
+        logger.info(f"User {request.user.username} accessing campaign dashboard {campaign_id}")
+        
+        # For admin/onboarding users, skip client validation
+        if request.user.role.name in [Role.ADMIN, Role.ONBOARDING]:
+            logger.debug(f"Admin/Onboarding user access for campaign {campaign_id}")
+            campaign = get_object_or_404(
+                ClientCampaignModel.objects.select_related(
+                    'campaign_model__campaign',
+                    'campaign_model__model',
+                    'client',
+                ),
+                id=campaign_id,
+                is_enabled=True
+            )
+            client = campaign.client
+        else:
+            # For client users, validate they own this campaign
+            logger.debug(f"Client user access for campaign {campaign_id}")
+            try:
+                client = Client.objects.get(client=request.user)
+                logger.debug(f"Found client: {client.name}")
+            except Client.DoesNotExist:
+                logger.error(f"Client profile not found for user {request.user.username}")
+                return render(request, 'clients/campaign_dashboard.html', {
+                    'error': 'Client profile not found. Please contact administrator.'
+                })
+            
+            campaign = get_object_or_404(
+                ClientCampaignModel.objects.select_related(
+                    'campaign_model__campaign',
+                    'campaign_model__model',
+                ),
+                id=campaign_id,
+                client=client,
+                is_enabled=True
+            )
+        
+        logger.info(f"Campaign found: {campaign.campaign_model.campaign.name}")
+        
+        # Get filter parameters
+        search_query = request.GET.get('search', '').strip()
+        list_id_query = request.GET.get('list_id', '').strip()
+        start_date = request.GET.get('start_date', '')
+        start_time = request.GET.get('start_time', '')
+        end_date = request.GET.get('end_date', '')
+        end_time = request.GET.get('end_time', '')
+        selected_categories = request.GET.getlist('categories')
+        
+        logger.debug(f"Filters - search: {search_query}, list_id: {list_id_query}, dates: {start_date} to {end_date}")
+        
+        # Default to today if no date filters are provided
+        has_any_filter = any([search_query, list_id_query, start_date, end_date, selected_categories])
+        
+        if not has_any_filter:
+            today = datetime.now().date()
+            start_date = today.strftime('%Y-%m-%d')
+            end_date = today.strftime('%Y-%m-%d')
+            logger.debug(f"No filters provided, defaulting to today: {start_date}")
+        
+        # Get latest stage for each number (simplified approach)
+        logger.info("Fetching latest stage for each number...")
         try:
-            client = Client.objects.get(client=request.user)
-        except Client.DoesNotExist:
+            latest_calls_by_number = Call.objects.filter(
+                client_campaign_model=campaign
+            ).values('number').annotate(
+                max_stage=Max('stage')
+            )
+            
+            # Build a dict for quick lookup
+            latest_stages = {item['number']: item['max_stage'] for item in latest_calls_by_number}
+            logger.debug(f"Found {len(latest_stages)} unique numbers with latest stages")
+            
+        except Exception as e:
+            logger.error(f"Error fetching latest stages: {str(e)}", exc_info=True)
             return render(request, 'clients/campaign_dashboard.html', {
-                'error': 'Client profile not found. Please contact administrator.'
+                'error': f'Database error while fetching call data: {str(e)}'
             })
         
-        campaign = get_object_or_404(
-            ClientCampaignModel.objects.select_related(
-                'campaign_model__campaign',
-                'campaign_model__model',
-            ),
-            id=campaign_id,
-            client=client,
-            is_enabled=True
-        )
-    
-    # Get filter parameters
-    search_query = request.GET.get('search', '').strip()
-    list_id_query = request.GET.get('list_id', '').strip()
-    start_date = request.GET.get('start_date', '')
-    start_time = request.GET.get('start_time', '')
-    end_date = request.GET.get('end_date', '')
-    end_time = request.GET.get('end_time', '')
-    selected_categories = request.GET.getlist('categories')
-    
-    # Default to today if no date filters are provided
-    has_any_filter = any([search_query, list_id_query, start_date, end_date, selected_categories])
-    
-    if not has_any_filter:
-        today = datetime.now().date()
-        start_date = today.strftime('%Y-%m-%d')
-        end_date = today.strftime('%Y-%m-%d')
-    
-    # Base query - get latest stage calls using subquery
-    from django.db.models import OuterRef, Subquery, Max
-    
-    # Subquery to get the maximum stage for each number
-    latest_stage_subquery = Call.objects.filter(
-        client_campaign_model=campaign,
-        number=OuterRef('number')
-    ).order_by().values('number').annotate(
-        max_stage=Max('stage')
-    ).values('max_stage')[:1]
-    
-    # Build base query for category counts with latest stage filter
-    category_count_query = Call.objects.filter(
-        client_campaign_model=campaign,
-        stage=Subquery(latest_stage_subquery)
-    )
-    
-    # Apply filters to category counts
-    if search_query:
-        category_count_query = category_count_query.filter(
-            Q(number__icontains=search_query) |
-            Q(response_category__name__icontains=search_query)
-        )
-    
-    if list_id_query:
-        category_count_query = category_count_query.filter(list_id__icontains=list_id_query)
-    
-    if start_date:
-        start_datetime = datetime.strptime(start_date, '%Y-%m-%d')
-        if start_time:
-            time_obj = datetime.strptime(start_time, '%H:%M').time()
-            start_datetime = datetime.combine(start_datetime.date(), time_obj)
-        category_count_query = category_count_query.filter(timestamp__gte=start_datetime)
-    
-    if end_date:
-        end_datetime = datetime.strptime(end_date, '%Y-%m-%d')
-        if end_time:
-            time_obj = datetime.strptime(end_time, '%H:%M').time()
-            end_datetime = datetime.combine(end_datetime.date(), time_obj)
-        else:
-            end_datetime = datetime.combine(end_datetime.date(), datetime.max.time())
-        category_count_query = category_count_query.filter(timestamp__lte=end_datetime)
-    
-    # Get category counts based on filtered calls (latest stage only)
-    category_counts_raw = category_count_query.values(
-        'response_category__id',
-        'response_category__name',
-        'response_category__color'
-    ).annotate(count=Count('id'))
-    
-    # Get ALL categories from database to ensure we show all, even with zero counts
-    all_db_categories = ResponseCategory.objects.all().values('id', 'name', 'color')
-    
-    # Combine categories according to mapping
-    combined_counts = {}
-    category_id_to_combined = {}  # Maps original category IDs to combined category names
-    category_colors = {}  # Store colors for combined categories
-    
-    # First, initialize all possible combined categories with zero counts
-    for db_cat in all_db_categories:
-        original_name = db_cat['name'] or 'UNKNOWN'
-        combined_name = CATEGORY_MAPPING.get(original_name, original_name)
+        # Build base query for category counts
+        logger.info("Building category counts query...")
+        try:
+            category_count_query = Call.objects.filter(
+                client_campaign_model=campaign
+            )
+            
+            # Apply filters to category counts
+            if search_query:
+                category_count_query = category_count_query.filter(
+                    Q(number__icontains=search_query) |
+                    Q(response_category__name__icontains=search_query)
+                )
+            
+            if list_id_query:
+                category_count_query = category_count_query.filter(list_id__icontains=list_id_query)
+            
+            if start_date:
+                try:
+                    start_datetime = datetime.strptime(start_date, '%Y-%m-%d')
+                    if start_time:
+                        time_obj = datetime.strptime(start_time, '%H:%M').time()
+                        start_datetime = datetime.combine(start_datetime.date(), time_obj)
+                    category_count_query = category_count_query.filter(timestamp__gte=start_datetime)
+                    logger.debug(f"Applied start date filter: {start_datetime}")
+                except ValueError as e:
+                    logger.error(f"Invalid start date format: {start_date} - {str(e)}")
+            
+            if end_date:
+                try:
+                    end_datetime = datetime.strptime(end_date, '%Y-%m-%d')
+                    if end_time:
+                        time_obj = datetime.strptime(end_time, '%H:%M').time()
+                        end_datetime = datetime.combine(end_datetime.date(), time_obj)
+                    else:
+                        end_datetime = datetime.combine(end_datetime.date(), datetime.max.time())
+                    category_count_query = category_count_query.filter(timestamp__lte=end_datetime)
+                    logger.debug(f"Applied end date filter: {end_datetime}")
+                except ValueError as e:
+                    logger.error(f"Invalid end date format: {end_date} - {str(e)}")
+            
+            # Filter to only latest stage calls
+            latest_stage_calls = []
+            for call in category_count_query.select_related('response_category'):
+                if call.number in latest_stages and call.stage == latest_stages[call.number]:
+                    latest_stage_calls.append(call)
+            
+            logger.debug(f"Filtered to {len(latest_stage_calls)} calls at latest stage")
+            
+        except Exception as e:
+            logger.error(f"Error building category count query: {str(e)}", exc_info=True)
+            return render(request, 'clients/campaign_dashboard.html', {
+                'error': f'Error processing filters: {str(e)}'
+            })
         
-        if combined_name not in combined_counts:
-            combined_counts[combined_name] = 0
-            category_colors[combined_name] = db_cat['color'] or '#6B7280'
-    
-    # Now add the actual counts
-    for item in category_counts_raw:
-        original_name = item['response_category__name'] or 'UNKNOWN'
-        original_id = item['response_category__id']
-        count = item['count']
-        color = item['response_category__color'] or '#6B7280'
+        # Get category counts
+        logger.info("Processing category counts...")
+        try:
+            # Get ALL categories from database
+            all_db_categories = ResponseCategory.objects.all().values('id', 'name', 'color')
+            logger.debug(f"Found {len(all_db_categories)} categories in database")
+            
+            # Count categories from filtered calls
+            category_counts_raw = {}
+            for call in latest_stage_calls:
+                if call.response_category:
+                    cat_id = call.response_category.id
+                    if cat_id not in category_counts_raw:
+                        category_counts_raw[cat_id] = {
+                            'id': cat_id,
+                            'name': call.response_category.name,
+                            'color': call.response_category.color,
+                            'count': 0
+                        }
+                    category_counts_raw[cat_id]['count'] += 1
+            
+            # Combine categories according to mapping
+            combined_counts = {}
+            category_colors = {}
+            
+            # Initialize all possible combined categories with zero counts
+            for db_cat in all_db_categories:
+                original_name = db_cat['name'] or 'UNKNOWN'
+                combined_name = CATEGORY_MAPPING.get(original_name, original_name)
+                
+                if combined_name not in combined_counts:
+                    combined_counts[combined_name] = 0
+                    category_colors[combined_name] = db_cat['color'] or '#6B7280'
+            
+            # Add actual counts
+            for cat_data in category_counts_raw.values():
+                original_name = cat_data['name'] or 'UNKNOWN'
+                combined_name = CATEGORY_MAPPING.get(original_name, original_name)
+                combined_counts[combined_name] += cat_data['count']
+                if not category_colors.get(combined_name):
+                    category_colors[combined_name] = cat_data['color'] or '#6B7280'
+            
+            # Build the all_categories list
+            all_categories = []
+            for combined_name, count in sorted(combined_counts.items()):
+                all_categories.append({
+                    'name': combined_name.capitalize(),
+                    'color': category_colors.get(combined_name, '#6B7280'),
+                    'count': count,
+                    'original_name': combined_name
+                })
+            
+            logger.debug(f"Processed {len(all_categories)} combined categories")
+            
+        except Exception as e:
+            logger.error(f"Error processing category counts: {str(e)}", exc_info=True)
+            return render(request, 'clients/campaign_dashboard.html', {
+                'error': f'Error processing category data: {str(e)}'
+            })
         
-        # Get the mapped category name
-        combined_name = CATEGORY_MAPPING.get(original_name, original_name)
+        # Build calls query
+        logger.info("Building main calls query...")
+        try:
+            calls = Call.objects.filter(
+                client_campaign_model=campaign
+            ).select_related('response_category', 'voice').order_by('-timestamp')
+            
+            # Apply filters
+            if search_query:
+                calls = calls.filter(
+                    Q(number__icontains=search_query) |
+                    Q(response_category__name__icontains=search_query)
+                )
+            
+            if list_id_query:
+                calls = calls.filter(list_id__icontains=list_id_query)
+            
+            if start_date:
+                try:
+                    start_datetime = datetime.strptime(start_date, '%Y-%m-%d')
+                    if start_time:
+                        time_obj = datetime.strptime(start_time, '%H:%M').time()
+                        start_datetime = datetime.combine(start_datetime.date(), time_obj)
+                    calls = calls.filter(timestamp__gte=start_datetime)
+                except ValueError as e:
+                    logger.error(f"Invalid start date in calls filter: {str(e)}")
+            
+            if end_date:
+                try:
+                    end_datetime = datetime.strptime(end_date, '%Y-%m-%d')
+                    if end_time:
+                        time_obj = datetime.strptime(end_time, '%H:%M').time()
+                        end_datetime = datetime.combine(end_datetime.date(), time_obj)
+                    else:
+                        end_datetime = datetime.combine(end_datetime.date(), datetime.max.time())
+                    calls = calls.filter(timestamp__lte=end_datetime)
+                except ValueError as e:
+                    logger.error(f"Invalid end date in calls filter: {str(e)}")
+            
+            # Filter by combined categories if selected
+            if selected_categories:
+                original_names = [
+                    name for name, combined in CATEGORY_MAPPING.items() 
+                    if combined in selected_categories
+                ]
+                original_names.extend([cat for cat in selected_categories if cat not in CATEGORY_MAPPING.values()])
+                calls = calls.filter(response_category__name__in=original_names)
+            
+            # Filter to latest stage only
+            calls_list = []
+            for call in calls:
+                if call.number in latest_stages and call.stage == latest_stages[call.number]:
+                    calls_list.append(call)
+            
+            total_calls = len(calls_list)
+            logger.info(f"Total calls after filtering: {total_calls}")
+            
+        except Exception as e:
+            logger.error(f"Error building calls query: {str(e)}", exc_info=True)
+            return render(request, 'clients/campaign_dashboard.html', {
+                'error': f'Error fetching call records: {str(e)}'
+            })
         
-        # Store mapping of original ID to combined name
-        category_id_to_combined[original_id] = combined_name
+        # Process calls data
+        logger.info("Processing calls data for display...")
+        try:
+            calls_data = []
+            for call in calls_list[:50]:
+                original_category_name = call.response_category.name if call.response_category else 'Unknown'
+                combined_category_name = CATEGORY_MAPPING.get(original_category_name, original_category_name)
+                
+                calls_data.append({
+                    'id': call.id,
+                    'number': call.number,
+                    'list_id': call.list_id or 'N/A',
+                    'category_color': call.response_category.color if call.response_category else '#6B7280',
+                    'category': combined_category_name.capitalize(),
+                    'timestamp': call.timestamp.strftime('%m/%d/%Y, %H:%M:%S'),
+                    'stage': call.stage or 0,
+                    'has_transcription': bool(call.transcription),
+                    'transcription': call.transcription or 'No transcript available',
+                })
+            
+            logger.debug(f"Processed {len(calls_data)} calls for display")
+            
+        except Exception as e:
+            logger.error(f"Error processing calls data: {str(e)}", exc_info=True)
+            return render(request, 'clients/campaign_dashboard.html', {
+                'error': f'Error formatting call data: {str(e)}'
+            })
         
-        # Accumulate counts for combined categories
-        combined_counts[combined_name] += count
-        # Update color if we didn't have one yet
-        if not category_colors.get(combined_name):
-            category_colors[combined_name] = color
-    
-    # Build the all_categories list with combined categories
-    all_categories = []
-    for combined_name, count in sorted(combined_counts.items()):
-        all_categories.append({
-            'name': combined_name.capitalize(),
-            'color': category_colors.get(combined_name, '#6B7280'),
-            'count': count,
-            'original_name': combined_name  # Keep for filtering
-        })
-    
-    # Base query for calls - only latest stage per number
-    calls = Call.objects.filter(
-        client_campaign_model=campaign,
-        stage=Subquery(latest_stage_subquery)
-    ).select_related('response_category', 'voice').order_by('-timestamp')
-    
-    # Apply filters
-    if search_query:
-        calls = calls.filter(
-            Q(number__icontains=search_query) |
-            Q(response_category__name__icontains=search_query)
-        )
-    
-    if list_id_query:
-        calls = calls.filter(list_id__icontains=list_id_query)
-    
-    if start_date:
-        start_datetime = datetime.strptime(start_date, '%Y-%m-%d')
-        if start_time:
-            time_obj = datetime.strptime(start_time, '%H:%M').time()
-            start_datetime = datetime.combine(start_datetime.date(), time_obj)
-        calls = calls.filter(timestamp__gte=start_datetime)
-    
-    if end_date:
-        end_datetime = datetime.strptime(end_date, '%Y-%m-%d')
-        if end_time:
-            time_obj = datetime.strptime(end_time, '%H:%M').time()
-            end_datetime = datetime.combine(end_datetime.date(), time_obj)
-        else:
-            end_datetime = datetime.combine(end_datetime.date(), datetime.max.time())
-        calls = calls.filter(timestamp__lte=end_datetime)
-    
-    # Filter by combined categories if selected
-    if selected_categories:
-        # Find all original category names that map to selected combined categories
-        original_names = [
-            name for name, combined in CATEGORY_MAPPING.items() 
-            if combined in selected_categories
-        ]
-        # Also include the combined names themselves if they weren't mapped
-        original_names.extend([cat for cat in selected_categories if cat not in CATEGORY_MAPPING.values()])
-        
-        calls = calls.filter(response_category__name__in=original_names)
-    
-    total_calls = calls.count()
-    
-    # Process calls - store transcript as plain text with combined category names
-    calls_data = []
-    for call in calls[:50]:
-        original_category_name = call.response_category.name if call.response_category else 'Unknown'
-        combined_category_name = CATEGORY_MAPPING.get(original_category_name, original_category_name)
-        
-        calls_data.append({
-            'id': call.id,
-            'number': call.number,
-            'list_id': call.list_id or 'N/A',
-            'category_color': call.response_category.color if call.response_category else '#6B7280',
-            'category': combined_category_name.capitalize(),
-            'timestamp': call.timestamp.strftime('%m/%d/%Y, %H:%M:%S'),
-            'stage': call.stage or 0,
-            'has_transcription': bool(call.transcription),
-            'transcription': call.transcription or 'No transcript available',
-        })
-    
-    context = {
-        'client_name': client.name,
-        'campaign': {
-            'id': campaign.id,
-            'name': campaign.campaign_model.campaign.name,
-            'model': campaign.campaign_model.model.name,
-            'is_active': campaign.is_active,
-        },
-        'calls': calls_data,
-        'total_calls': total_calls,
-        'all_categories': all_categories,
-        'filters': {
-            'search': search_query,
-            'list_id': list_id_query,
-            'start_date': start_date,
-            'start_time': start_time,
-            'end_date': end_date,
-            'end_time': end_time,
-            'selected_categories': selected_categories,
+        # Build context
+        context = {
+            'client_name': client.name,
+            'campaign': {
+                'id': campaign.id,
+                'name': campaign.campaign_model.campaign.name,
+                'model': campaign.campaign_model.model.name,
+                'is_active': campaign.is_active,
+            },
+            'calls': calls_data,
+            'total_calls': total_calls,
+            'all_categories': all_categories,
+            'filters': {
+                'search': search_query,
+                'list_id': list_id_query,
+                'start_date': start_date,
+                'start_time': start_time,
+                'end_date': end_date,
+                'end_time': end_time,
+                'selected_categories': selected_categories,
+            }
         }
-    }
+        
+        logger.info(f"Successfully rendered dashboard for campaign {campaign_id}")
+        return render(request, 'clients/campaign_dashboard.html', context)
+        
+    except ClientCampaignModel.DoesNotExist:
+        logger.error(f"Campaign {campaign_id} not found or not enabled")
+        return render(request, 'clients/campaign_dashboard.html', {
+            'error': 'Campaign not found or access denied.'
+        })
     
-    return render(request, 'clients/campaign_dashboard.html', context)
-
+    except Exception as e:
+        logger.error(f"Unexpected error in campaign_dashboard for campaign {campaign_id}: {str(e)}", exc_info=True)
+        return render(request, 'clients/campaign_dashboard.html', {
+            'error': f'An unexpected error occurred. Please contact support. Error: {str(e)}'
+        })
+    
 @login_required(login_url='/accounts/login/')
 @role_required([Role.CLIENT, Role.ONBOARDING, Role.ADMIN])
 def campaign_recordings(request, campaign_id):
