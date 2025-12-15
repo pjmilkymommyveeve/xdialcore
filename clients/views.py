@@ -519,211 +519,324 @@ def campaign_recordings(request, campaign_id):
 @login_required(login_url='/accounts/login/')
 @role_required([Role.CLIENT, Role.ONBOARDING, Role.ADMIN])
 def data_export(request, campaign_id):
-    """Data export page with combined category mapping - FIXED VERSION"""
-    # For admin/onboarding users, skip client validation
-    if request.user.role.name in [Role.ADMIN, Role.ONBOARDING]:
-        campaign = get_object_or_404(
-            ClientCampaignModel.objects.select_related(
-                'campaign_model__campaign',
-                'campaign_model__model',
-                'client',
-            ),
-            id=campaign_id,
-            is_enabled=True
-        )
-        client = campaign.client
-    else:
-        # For client users, validate they own this campaign
-        try:
-            client = Client.objects.get(client=request.user)
-        except Client.DoesNotExist:
-            return render(request, 'clients/data_export.html', {
-                'error': 'Client profile not found. Please contact administrator.'
-            })
+    """Data export page with combined category mapping - FIXED VERSION WITH COMPLETE LOGGING"""
+    logger.info(f"=== DATA EXPORT START === User: {request.user.username}, Campaign: {campaign_id}, Method: {request.method}")
+    
+    try:
+        # For admin/onboarding users, skip client validation
+        if request.user.role.name in [Role.ADMIN, Role.ONBOARDING]:
+            logger.debug(f"Admin/Onboarding user access for campaign {campaign_id}")
+            campaign = get_object_or_404(
+                ClientCampaignModel.objects.select_related(
+                    'campaign_model__campaign',
+                    'campaign_model__model',
+                    'client',
+                ),
+                id=campaign_id,
+                is_enabled=True
+            )
+            client = campaign.client
+        else:
+            # For client users, validate they own this campaign
+            logger.debug(f"Client user access for campaign {campaign_id}")
+            try:
+                client = Client.objects.get(client=request.user)
+                logger.debug(f"Found client: {client.name}")
+            except Client.DoesNotExist:
+                logger.error(f"Client profile not found for user {request.user.username}")
+                return render(request, 'clients/data_export.html', {
+                    'error': 'Client profile not found. Please contact administrator.'
+                })
+            
+            campaign = get_object_or_404(
+                ClientCampaignModel.objects.select_related(
+                    'campaign_model__campaign',
+                    'campaign_model__model',
+                ),
+                id=campaign_id,
+                client=client,
+                is_enabled=True
+            )
         
-        campaign = get_object_or_404(
-            ClientCampaignModel.objects.select_related(
-                'campaign_model__campaign',
-                'campaign_model__model',
-            ),
-            id=campaign_id,
-            client=client,
-            is_enabled=True
-        )
+        logger.info(f"Campaign found: {campaign.campaign_model.campaign.name}")
+    
+    except Exception as e:
+        logger.error(f"Error fetching campaign: {str(e)}", exc_info=True)
+        return render(request, 'clients/data_export.html', {
+            'error': f'Error loading campaign: {str(e)}'
+        })
     
     if request.method == 'POST':
-        export_data_json = request.POST.get('export_data', '{}')
-        export_data = json.loads(export_data_json)
+        logger.info("POST request - Starting export")
+        try:
+            export_data_json = request.POST.get('export_data', '{}')
+            logger.debug(f"Export data JSON: {export_data_json}")
+            export_data = json.loads(export_data_json)
+            logger.debug(f"Parsed export data: {export_data}")
+            
+            # Get latest stage for each number (same logic as dashboard)
+            logger.info("Fetching latest stages...")
+            latest_calls_by_number = Call.objects.filter(
+                client_campaign_model=campaign
+            ).values('number').annotate(
+                max_stage=Max('stage')
+            )
+            latest_stages = {item['number']: item['max_stage'] for item in latest_calls_by_number}
+            logger.debug(f"Found {len(latest_stages)} unique numbers with latest stages")
+            
+            calls = Call.objects.filter(
+                client_campaign_model=campaign
+            ).select_related('response_category', 'voice')
+            
+            logger.info("Applying filters...")
+            # Apply filters
+            list_ids = export_data.get('list_ids', [])
+            if list_ids:
+                logger.debug(f"Filtering by list_ids: {list_ids}")
+                calls = calls.filter(list_id__in=list_ids)
+            
+            # Handle combined categories - FIXED VERSION with case-insensitive matching
+            selected_combined_categories = export_data.get('categories', [])
+            if selected_combined_categories:
+                logger.debug(f"Selected categories: {selected_combined_categories}")
+                # Convert selected categories to lowercase for comparison
+                selected_lower = [cat.lower().strip() for cat in selected_combined_categories]
+                logger.debug(f"Normalized selected categories: {selected_lower}")
+                
+                # Find all original category names that map to selected combined categories
+                original_category_ids = []
+                all_db_categories = ResponseCategory.objects.all()
+                logger.debug(f"Total DB categories: {all_db_categories.count()}")
+                
+                for db_category in all_db_categories:
+                    original_name = (db_category.name or 'UNKNOWN').lower().strip()
+                    # Get the combined name from mapping (lowercase key)
+                    combined_name = CATEGORY_MAPPING.get(original_name, original_name)
+                    
+                    # Case-insensitive comparison
+                    if combined_name.lower().strip() in selected_lower:
+                        original_category_ids.append(db_category.id)
+                        logger.debug(f"Matched category: {db_category.name} -> {combined_name}")
+                
+                logger.debug(f"Matched category IDs: {original_category_ids}")
+                if original_category_ids:
+                    calls = calls.filter(response_category__id__in=original_category_ids)
+            
+            start_date = export_data.get('start_date')
+            start_time = export_data.get('start_time')
+            end_date = export_data.get('end_date')
+            end_time = export_data.get('end_time')
+            
+            if start_date:
+                logger.debug(f"Start date filter: {start_date} {start_time}")
+                try:
+                    start_datetime = datetime.strptime(start_date, '%Y-%m-%d')
+                    if start_time:
+                        time_obj = datetime.strptime(start_time, '%H:%M').time()
+                        start_datetime = datetime.combine(start_datetime.date(), time_obj)
+                    calls = calls.filter(timestamp__gte=start_datetime)
+                    logger.debug(f"Applied start datetime: {start_datetime}")
+                except Exception as e:
+                    logger.error(f"Error parsing start date: {str(e)}")
+            
+            if end_date:
+                logger.debug(f"End date filter: {end_date} {end_time}")
+                try:
+                    end_datetime = datetime.strptime(end_date, '%Y-%m-%d')
+                    if end_time:
+                        time_obj = datetime.strptime(end_time, '%H:%M').time()
+                        end_datetime = datetime.combine(end_datetime.date(), time_obj)
+                    else:
+                        end_datetime = datetime.combine(end_datetime.date(), datetime.max.time())
+                    calls = calls.filter(timestamp__lte=end_datetime)
+                    logger.debug(f"Applied end datetime: {end_datetime}")
+                except Exception as e:
+                    logger.error(f"Error parsing end date: {str(e)}")
+            
+            logger.info(f"Total calls before latest stage filter: {calls.count()}")
+            
+            # Filter to latest stage only (same as dashboard)
+            logger.info("Filtering to latest stage only...")
+            filtered_calls = []
+            for call in calls:
+                if call.number in latest_stages and call.stage == latest_stages[call.number]:
+                    filtered_calls.append(call)
+            
+            logger.info(f"Total calls after latest stage filter: {len(filtered_calls)}")
+            
+            # Create CSV
+            logger.info("Creating CSV response...")
+            response = HttpResponse(content_type='text/csv')
+            filename = f"call_data_{campaign.campaign_model.campaign.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            
+            writer = csv.writer(response)
+            writer.writerow([
+                'Call ID', 'Phone Number', 'List ID', 'Category', 'Timestamp',
+                'Transferred', 'Stage', 'Voice', 'Transcription'
+            ])
+            
+            for call in filtered_calls:
+                # Map original category to combined category name
+                original_category_name = call.response_category.name if call.response_category else 'Unknown'
+                # Use lowercase for lookup in mapping
+                combined_category_name = CATEGORY_MAPPING.get(
+                    original_category_name.lower() if original_category_name else 'unknown',
+                    original_category_name
+                )
+                
+                writer.writerow([
+                    call.id,
+                    call.number,
+                    call.list_id or '',
+                    combined_category_name.capitalize(),
+                    call.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                    'Yes' if call.transferred else 'No',
+                    call.stage or 0,
+                    call.voice.name if call.voice else 'Unknown',
+                    call.transcription or ''
+                ])
+            
+            logger.info(f"CSV export successful: {len(filtered_calls)} records")
+            return response
         
-        # Get latest stage for each number (same logic as dashboard)
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {str(e)}", exc_info=True)
+            return render(request, 'clients/data_export.html', {
+                'error': f'Invalid export data format: {str(e)}',
+                'client_name': client.name,
+                'campaign': {
+                    'id': campaign.id,
+                    'name': campaign.campaign_model.campaign.name,
+                    'model': campaign.campaign_model.model.name,
+                },
+                'list_ids': [],
+                'all_categories': [],
+            })
+        
+        except Exception as e:
+            logger.error(f"Error during export: {str(e)}", exc_info=True)
+            return render(request, 'clients/data_export.html', {
+                'error': f'Error generating export: {str(e)}',
+                'client_name': client.name,
+                'campaign': {
+                    'id': campaign.id,
+                    'name': campaign.campaign_model.campaign.name,
+                    'model': campaign.campaign_model.model.name,
+                },
+                'list_ids': [],
+                'all_categories': [],
+            })
+    
+    # GET request - display form with combined categories
+    logger.info("GET request - Displaying export form")
+    try:
+        logger.info("Fetching list IDs...")
+        list_ids = Call.objects.filter(
+            client_campaign_model=campaign,
+            list_id__isnull=False
+        ).exclude(list_id='').values_list('list_id', flat=True).distinct().order_by('list_id')
+        logger.debug(f"Found {len(list_ids)} unique list IDs")
+        
+        # Get latest stage for each number for accurate counts
+        logger.info("Fetching latest stages for counts...")
         latest_calls_by_number = Call.objects.filter(
             client_campaign_model=campaign
         ).values('number').annotate(
             max_stage=Max('stage')
         )
         latest_stages = {item['number']: item['max_stage'] for item in latest_calls_by_number}
+        logger.debug(f"Found {len(latest_stages)} unique numbers")
         
-        calls = Call.objects.filter(
+        # Get all categories from database
+        logger.info("Fetching categories...")
+        all_db_categories = ResponseCategory.objects.all()
+        logger.debug(f"Total categories in database: {all_db_categories.count()}")
+        
+        # Get call counts per original category (ONLY LATEST STAGE)
+        logger.info("Counting calls by category (latest stage only)...")
+        all_calls = Call.objects.filter(
             client_campaign_model=campaign
-        ).select_related('response_category', 'voice')
+        ).select_related('response_category')
         
-        # Apply filters
-        list_ids = export_data.get('list_ids', [])
-        if list_ids:
-            calls = calls.filter(list_id__in=list_ids)
+        total_calls_before_filter = all_calls.count()
+        logger.debug(f"Total calls before latest stage filter: {total_calls_before_filter}")
         
-        # Handle combined categories - FIXED VERSION with case-insensitive matching
-        selected_combined_categories = export_data.get('categories', [])
-        if selected_combined_categories:
-            # Convert selected categories to lowercase for comparison
-            selected_lower = [cat.lower().strip() for cat in selected_combined_categories]
-            
-            # Find all original category names that map to selected combined categories
-            original_category_ids = []
-            for db_category in ResponseCategory.objects.all():
-                original_name = (db_category.name or 'UNKNOWN').lower().strip()
-                # Get the combined name from mapping (lowercase key)
-                combined_name = CATEGORY_MAPPING.get(original_name, original_name)
-                
-                # Case-insensitive comparison
-                if combined_name.lower().strip() in selected_lower:
-                    original_category_ids.append(db_category.id)
-            
-            if original_category_ids:
-                calls = calls.filter(response_category__id__in=original_category_ids)
-        
-        start_date = export_data.get('start_date')
-        start_time = export_data.get('start_time')
-        end_date = export_data.get('end_date')
-        end_time = export_data.get('end_time')
-        
-        if start_date:
-            start_datetime = datetime.strptime(start_date, '%Y-%m-%d')
-            if start_time:
-                time_obj = datetime.strptime(start_time, '%H:%M').time()
-                start_datetime = datetime.combine(start_datetime.date(), time_obj)
-            calls = calls.filter(timestamp__gte=start_datetime)
-        
-        if end_date:
-            end_datetime = datetime.strptime(end_date, '%Y-%m-%d')
-            if end_time:
-                time_obj = datetime.strptime(end_time, '%H:%M').time()
-                end_datetime = datetime.combine(end_datetime.date(), time_obj)
-            else:
-                end_datetime = datetime.combine(end_datetime.date(), datetime.max.time())
-            calls = calls.filter(timestamp__lte=end_datetime)
-        
-        # Filter to latest stage only (same as dashboard)
-        filtered_calls = []
-        for call in calls:
+        # Filter to latest stage only
+        latest_stage_calls = []
+        for call in all_calls:
             if call.number in latest_stages and call.stage == latest_stages[call.number]:
-                filtered_calls.append(call)
+                latest_stage_calls.append(call)
         
-        # Create CSV
-        response = HttpResponse(content_type='text/csv')
-        filename = f"call_data_{campaign.campaign_model.campaign.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        logger.debug(f"Total calls after latest stage filter: {len(latest_stage_calls)}")
         
-        writer = csv.writer(response)
-        writer.writerow([
-            'Call ID', 'Phone Number', 'List ID', 'Category', 'Timestamp',
-            'Transferred', 'Stage', 'Voice', 'Transcription'
-        ])
+        # Count categories from latest stage calls
+        category_count_dict = {}
+        for call in latest_stage_calls:
+            if call.response_category:
+                cat_name = (call.response_category.name or 'UNKNOWN').lower().strip()
+                category_count_dict[cat_name] = category_count_dict.get(cat_name, 0) + 1
         
-        for call in filtered_calls:
-            # Map original category to combined category name
-            original_category_name = call.response_category.name if call.response_category else 'Unknown'
-            # Use lowercase for lookup in mapping
-            combined_category_name = CATEGORY_MAPPING.get(
-                original_category_name.lower() if original_category_name else 'unknown',
-                original_category_name
-            )
+        logger.debug(f"Category counts: {category_count_dict}")
+        
+        # Combine categories according to mapping
+        logger.info("Combining categories according to mapping...")
+        combined_counts = {}
+        
+        for db_cat in all_db_categories:
+            original_name = (db_cat.name or 'UNKNOWN').lower().strip()
+            combined_name = CATEGORY_MAPPING.get(original_name, original_name)
+            count = category_count_dict.get(original_name, 0)
             
-            writer.writerow([
-                call.id,
-                call.number,
-                call.list_id or '',
-                combined_category_name.capitalize(),
-                call.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                'Yes' if call.transferred else 'No',
-                call.stage or 0,
-                call.voice.name if call.voice else 'Unknown',
-                call.transcription or ''
-            ])
+            logger.debug(f"Category: {original_name} -> {combined_name} (count: {count})")
+            
+            # Accumulate counts for combined categories
+            if combined_name in combined_counts:
+                combined_counts[combined_name] += count
+            else:
+                combined_counts[combined_name] = count
         
-        return response
-    
-    # GET request - display form with combined categories
-    list_ids = Call.objects.filter(
-        client_campaign_model=campaign,
-        list_id__isnull=False
-    ).exclude(list_id='').values_list('list_id', flat=True).distinct().order_by('list_id')
-    
-    # Get latest stage for each number for accurate counts
-    latest_calls_by_number = Call.objects.filter(
-        client_campaign_model=campaign
-    ).values('number').annotate(
-        max_stage=Max('stage')
-    )
-    latest_stages = {item['number']: item['max_stage'] for item in latest_calls_by_number}
-    
-    # Get all categories from database
-    all_db_categories = ResponseCategory.objects.all()
-    
-    # Get call counts per original category (ONLY LATEST STAGE)
-    all_calls = Call.objects.filter(
-        client_campaign_model=campaign
-    ).select_related('response_category')
-    
-    # Filter to latest stage only
-    latest_stage_calls = [
-        call for call in all_calls
-        if call.number in latest_stages and call.stage == latest_stages[call.number]
-    ]
-    
-    # Count categories from latest stage calls
-    category_count_dict = {}
-    for call in latest_stage_calls:
-        cat_name = (call.response_category.name or 'UNKNOWN').lower().strip()
-        category_count_dict[cat_name] = category_count_dict.get(cat_name, 0) + 1
-    
-    # Combine categories according to mapping
-    combined_counts = {}
-    
-    for db_cat in all_db_categories:
-        original_name = (db_cat.name or 'UNKNOWN').lower().strip()
-        combined_name = CATEGORY_MAPPING.get(original_name, original_name)
-        count = category_count_dict.get(original_name, 0)
+        logger.debug(f"Combined counts: {combined_counts}")
         
-        # Accumulate counts for combined categories
-        if combined_name in combined_counts:
-            combined_counts[combined_name] += count
-        else:
-            combined_counts[combined_name] = count
+        # Build the all_categories list with combined categories
+        all_categories = []
+        for combined_name, count in sorted(combined_counts.items()):
+            all_categories.append({
+                'name': combined_name.capitalize(),
+                'combined_name': combined_name,  # For form submission
+                'count': count
+            })
+        
+        logger.info(f"Built {len(all_categories)} categories for display")
+        
+        context = {
+            'client_name': client.name,
+            'campaign': {
+                'id': campaign.id,
+                'name': campaign.campaign_model.campaign.name,
+                'model': campaign.campaign_model.model.name,
+            },
+            'list_ids': list(list_ids),
+            'all_categories': all_categories,
+        }
+        
+        logger.info(f"Rendering data_export.html with {len(list_ids)} list_ids and {len(all_categories)} categories")
+        return render(request, 'clients/data_export.html', context)
     
-    # Build the all_categories list with combined categories
-    all_categories = []
-    for combined_name, count in sorted(combined_counts.items()):
-        all_categories.append({
-            'name': combined_name.capitalize(),
-            'combined_name': combined_name,  # For form submission
-            'count': count
+    except Exception as e:
+        logger.error(f"Error in GET request: {str(e)}", exc_info=True)
+        return render(request, 'clients/data_export.html', {
+            'error': f'Error loading export form: {str(e)}',
+            'client_name': client.name,
+            'campaign': {
+                'id': campaign.id,
+                'name': campaign.campaign_model.campaign.name,
+                'model': campaign.campaign_model.model.name,
+            },
+            'list_ids': [],
+            'all_categories': [],
         })
     
-    context = {
-        'client_name': client.name,
-        'campaign': {
-            'id': campaign.id,
-            'name': campaign.campaign_model.campaign.name,
-            'model': campaign.campaign_model.model.name,
-        },
-        'list_ids': list(list_ids),
-        'all_categories': all_categories,
-    }
-    
-    return render(request, 'clients/data_export.html', context)
-
-
 def integration_request(request):
     """
     Public integration request form.
