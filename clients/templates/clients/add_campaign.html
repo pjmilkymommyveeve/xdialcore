@@ -1,0 +1,911 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add New Campaign - {{ client_name }}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #F9FAFB;
+            color: #111827;
+        }
+
+        .page-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        .page-header {
+            background: white;
+            border: 1px solid #F3F4F6;
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-content h1 {
+            font-size: 1.875rem;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 0.25rem;
+        }
+
+        .header-content p {
+            font-size: 0.9375rem;
+            color: #6B7280;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.625rem 1.25rem;
+            background: white;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            color: #6B7280;
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            background: #F9FAFB;
+            border-color: #D1D5DB;
+            color: #4B5563;
+        }
+
+        .form-card {
+            background: white;
+            border: 1px solid #F3F4F6;
+            border-radius: 12px;
+            padding: 2rem;
+        }
+
+        .form-section {
+            margin-bottom: 2.5rem;
+            padding-bottom: 2.5rem;
+            border-bottom: 1px solid #F3F4F6;
+        }
+
+        .form-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .section-header i {
+            font-size: 1.5rem;
+            color: #4F46E5;
+        }
+
+        .section-header h2 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #111827;
+            margin: 0;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 0.5rem;
+        }
+
+        .required {
+            color: #DC2626;
+            margin-left: 2px;
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="number"],
+        .form-group input[type="password"],
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            font-size: 0.9375rem;
+            color: #111827;
+            border: 1px solid #D1D5DB;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            font-family: 'Inter', sans-serif;
+            background: #FFFFFF;
+        }
+
+        .form-group select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            padding-right: 2.5rem;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #4F46E5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-hint {
+            display: block;
+            font-size: 0.8125rem;
+            color: #6B7280;
+            margin-top: 0.375rem;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-top: 0.5rem;
+        }
+
+        .radio-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            border: 2px solid #E5E7EB;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #FFFFFF;
+            font-size: 0.9375rem;
+        }
+
+        .radio-label:hover {
+            border-color: #D1D5DB;
+            background: #FAFAFA;
+        }
+
+        .radio-label input[type="radio"] {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #D1D5DB;
+            border-radius: 50%;
+            background: #FFFFFF;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .radio-label input[type="radio"]:checked {
+            border-color: #4F46E5;
+            background: #4F46E5;
+            border-width: 6px;
+        }
+
+        .radio-label:has(input[type="radio"]:checked) {
+            border-color: #4F46E5;
+            background: #EEF2FF;
+        }
+
+        .subsection {
+            background: #F9FAFB;
+            padding: 1.75rem;
+            border-radius: 10px;
+            margin-top: 1.5rem;
+            border: 1px solid #E5E7EB;
+        }
+
+        .subsection.closer {
+            background: #FEF3C7;
+            border-color: #FDE047;
+        }
+
+        .subsection-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #374151;
+            margin: 0 0 1.5rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .slider-container {
+            width: 100%;
+            margin: 1rem 0;
+        }
+
+        .quality-slider {
+            width: 100%;
+            height: 24px;
+            border-radius: 5px;
+            background: #EEF2FF;
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        .quality-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #4F46E5;
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s ease;
+        }
+
+        .quality-slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #4F46E5;
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.75rem;
+            padding: 0 2px;
+        }
+
+        .slider-labels span {
+            font-size: 0.8125rem;
+            color: #6B7280;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            text-align: center;
+            flex: 1;
+        }
+
+        .slider-labels span.active {
+            color: #4F46E5;
+            font-weight: 600;
+        }
+
+        .transfer-info-box {
+            margin-top: 1.5rem;
+            padding: 1.25rem;
+            background: #EEF2FF;
+            border: 2px solid #C7D2FE;
+            border-radius: 10px;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .info-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .model-tag {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #6B7280;
+            padding: 0.375rem 0.75rem;
+            background: #F3F4F6;
+            border-radius: 6px;
+        }
+
+        .badge {
+            display: inline-flex;
+            padding: 0.375rem 0.875rem;
+            background: transparent;
+            color: #374151;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .recommended-badge {
+            background: #DCFCE7;
+            color: #166534;
+            border: 1px solid #86EFAC;
+        }
+
+        .transfer-info-box p {
+            font-size: 0.8125rem;
+            color: #6B7280;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .metric-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .metric-circle {
+            position: relative;
+            width: 100px;
+            height: 100px;
+        }
+
+        .circular-chart {
+            display: block;
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+
+        .circle-bg {
+            fill: none;
+            stroke: #E5E7EB;
+            stroke-width: 2.5;
+        }
+
+        .circle {
+            fill: none;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            animation: progress 1s ease-out forwards;
+        }
+
+        .circle.quality {
+            stroke: #4F46E5;
+        }
+
+        .circle.volume {
+            stroke: #3B82F6;
+        }
+
+        @keyframes progress {
+            0% {
+                stroke-dasharray: 0 100;
+            }
+        }
+
+        .metric-number {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .metric-label {
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: #6B7280;
+            text-align: center;
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+            color: white;
+            border: none;
+            padding: 1rem 2.5rem;
+            font-size: 1rem;
+            font-weight: 500;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.625rem;
+            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(79, 70, 229, 0.35);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .submit-message {
+            margin: 1.5rem 0 0 0;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.9375rem;
+            font-weight: 500;
+        }
+
+        .submit-message.success {
+            background: #D1FAE5;
+            color: #065F46;
+            border: 1px solid #6EE7B7;
+        }
+
+        .submit-message.error {
+            background: #FEE2E2;
+            color: #991B1B;
+            border: 1px solid #FCA5A5;
+        }
+
+        .submit-message.hidden {
+            display: none;
+        }
+
+        .error-message {
+            background: #FEE2E2;
+            border: 1px solid #FCA5A5;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            color: #DC2626;
+            font-size: 0.875rem;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .page-header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-container">
+        <div class="page-header">
+            <div class="header-content">
+                <h1>Add New Campaign</h1>
+                <p>Configure a new campaign for {{ client_name }}</p>
+            </div>
+            <a href="{% url 'clients:client_landing' %}" class="back-btn">
+                <i class="bi bi-arrow-left"></i>
+                Back to Dashboard
+            </a>
+        </div>
+
+        {% if error %}
+        <div class="error-message">
+            <i class="bi bi-exclamation-circle-fill"></i>
+            {{ error }}
+        </div>
+        {% else %}
+        <div class="form-card">
+            <form id="addCampaignForm">
+                {% csrf_token %}
+
+                <section class="form-section">
+                    <div class="section-header">
+                        <i class="bi bi-robot"></i>
+                        <h2>Campaign Configuration</h2>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="campaign">Campaign Type <span class="required">*</span></label>
+                        <select id="campaign" name="campaign" required>
+                            <option value="">Select Campaign</option>
+                            {% for campaign in campaigns %}
+                            <option value="{{ campaign.name }}">{{ campaign.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div id="transferSettingsContainer" style="display: none;">
+                        <div class="form-group">
+                            <label>Transfer Quality Settings <span class="required">*</span></label>
+                            <div class="slider-container">
+                                <input type="range" id="qualitySlider" class="quality-slider" min="0" max="0" value="0" required />
+                                <div class="slider-labels" id="sliderLabels"></div>
+                            </div>
+                            <div id="transferInfoBox" class="transfer-info-box"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="numberOfBots">Number of Remote Agents <span class="required">*</span></label>
+                        <input type="number" id="numberOfBots" name="numberOfBots" placeholder="e.g., 10" min="1" max="1000" required />
+                        <small class="form-hint">Specify how many concurrent remote agents you need (1-1000)</small>
+                    </div>
+                </section>
+
+                <section class="form-section">
+                    <div class="section-header">
+                        <i class="bi bi-hdd-network"></i>
+                        <h2>Integration Settings</h2>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Dialler Configuration <span class="required">*</span></label>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="setupType" value="same" checked />
+                                <span>Same Dialler</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="setupType" value="separate" />
+                                <span>Separate Closer Dialler</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="subsection">
+                        <h3 class="subsection-title">
+                            <i class="bi bi-telephone-fill"></i>
+                            Primary Dialler Settings
+                        </h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="primaryIpValidation">IP Validation Link <span class="required">*</span></label>
+                                <input type="text" id="primaryIpValidation" name="primaryIpValidation" placeholder="e.g., example.com" required />
+                            </div>
+                            <div class="form-group">
+                                <label for="primaryAdminLink">Admin Link <span class="required">*</span></label>
+                                <input type="text" id="primaryAdminLink" name="primaryAdminLink" placeholder="e.g., dialer.com" required />
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="primaryUser">Username <span class="required">*</span></label>
+                                <input type="text" id="primaryUser" name="primaryUser" placeholder="Admin username" required />
+                            </div>
+                            <div class="form-group">
+                                <label for="primaryPassword">Password <span class="required">*</span></label>
+                                <input type="password" id="primaryPassword" name="primaryPassword" placeholder="Admin password" required />
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="primaryBotsCampaign">Fronting Campaign</label>
+                                <input type="text" id="primaryBotsCampaign" name="primaryBotsCampaign" placeholder="Campaign name (optional)" />
+                            </div>
+                            <div class="form-group">
+                                <label for="primaryUserSeries">Verifier Campaign</label>
+                                <input type="text" id="primaryUserSeries" name="primaryUserSeries" placeholder="Campaign name (optional)" />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="primaryPort">Port</label>
+                            <input type="text" id="primaryPort" name="primaryPort" placeholder="e.g., 5060" />
+                        </div>
+                    </div>
+
+                    <div id="closerSection" class="subsection closer" style="display: none;">
+                        <h3 class="subsection-title">
+                            <i class="bi bi-diagram-3"></i>
+                            Closer Dialler Settings
+                        </h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="closerIpValidation">IP Validation Link</label>
+                                <input type="text" id="closerIpValidation" name="closerIpValidation" placeholder="e.g., example.com" />
+                            </div>
+                            <div class="form-group">
+                                <label for="closerAdminLink">Admin Link</label>
+                                <input type="text" id="closerAdminLink" name="closerAdminLink" placeholder="e.g., closer-dialer.com" />
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="closerUser">Username</label>
+                                <input type="text" id="closerUser" name="closerUser" placeholder="Admin username" />
+                            </div>
+                            <div class="form-group">
+                                <label for="closerPassword">Password</label>
+                                <input type="password" id="closerPassword" name="closerPassword" placeholder="Admin password" />
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="closerCampaign">Campaign</label>
+                                <input type="text" id="closerCampaign" name="closerCampaign" placeholder="Campaign name" />
+                            </div>
+                            <div class="form-group">
+                                <label for="closerIngroup">Ingroup</label>
+                                <input type="text" id="closerIngroup" name="closerIngroup" placeholder="Inbound group" />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="closerPort">Port</label>
+                            <input type="text" id="closerPort" name="closerPort" placeholder="e.g., 5060" />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section">
+                    <div class="section-header">
+                        <i class="bi bi-chat-square-text"></i>
+                        <h2>Current Remote Agents</h2>
+                    </div>
+                    <div class="form-group">
+                        <label for="customRequirements">What company's remote agents are you currently using? (Optional)</label>
+                        <textarea id="customRequirements" name="customRequirements" rows="4"></textarea>
+                    </div>
+                </section>
+
+                <div class="form-actions">
+                    <button type="submit" class="submit-btn" id="submitBtn">
+                        <i class="bi bi-send-fill"></i>
+                        Submit Campaign Request
+                    </button>
+                </div>
+
+                <div id="submitMessage" class="submit-message hidden">
+                    <i></i>
+                    <span></span>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        const campaignConfig = {{ campaign_config|safe }};
+        const transferSettings = {{ transfer_settings|safe }};
+
+        let formData = {
+            campaign: '',
+            modelName: '',
+            transferSettingsId: null,
+            numberOfBots: '',
+            setupType: 'same'
+        };
+
+        let currentTransferSettings = [];
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        function showMessage(type, text) {
+            const messageEl = document.getElementById('submitMessage');
+            const iconEl = messageEl.querySelector('i');
+            const textEl = messageEl.querySelector('span');
+
+            messageEl.className = `submit-message ${type}`;
+            iconEl.className = type === 'success' ? 'bi bi-check-circle-fill' : 'bi bi-exclamation-circle-fill';
+            textEl.textContent = text;
+            messageEl.classList.remove('hidden');
+
+            if (type === 'success') {
+                setTimeout(() => {
+                    window.location.href = "{% url 'clients:client_landing' %}";
+                }, 2000);
+            } else {
+                setTimeout(() => messageEl.classList.add('hidden'), 5000);
+            }
+        }
+
+        function updateSliderLabels(campaign) {
+            const models = campaignConfig[campaign] || {};
+            const modelNames = Object.keys(models);
+            
+            if (modelNames.length === 0) return;
+
+            const firstModel = modelNames[0];
+            const transferSettingIds = models[firstModel].map(ts => ts.id);
+            
+            currentTransferSettings = transferSettings
+                .filter(ts => transferSettingIds.includes(ts.id))
+                .sort((a, b) => a.display_order - b.display_order);
+
+            const slider = document.getElementById('qualitySlider');
+            slider.max = currentTransferSettings.length - 1;
+            slider.value = 0;
+
+            formData.transferSettingsId = currentTransferSettings[0].id;
+            formData.modelName = firstModel;
+
+            const sliderLabels = document.getElementById('sliderLabels');
+            sliderLabels.innerHTML = currentTransferSettings
+                .map((ts, index) => `<span class="${index === 0 ? 'active' : ''}">${ts.name}</span>`)
+                .join('');
+
+            updateTransferInfoBox();
+        }
+
+        function updateTransferInfoBox() {
+            const setting = currentTransferSettings.find(ts => ts.id === formData.transferSettingsId);
+            if (!setting) return;
+
+            const infoBox = document.getElementById('transferInfoBox');
+            infoBox.innerHTML = `
+                <div class="info-header">
+                    <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                        <div class="model-tag" style="align-self: flex-start;">${formData.modelName} Model</div>
+                        <span class="badge ${setting.is_recommended ? 'recommended-badge' : ''}" style="align-self: center; margin-top: 12px;">
+                            ${setting.name}${setting.is_recommended ? ' (Recommended)' : ''}
+                        </span>
+                    </div>
+                </div>
+                <p style="margin-top: -30px;">${setting.description || 'No description available'}</p>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-circle">
+                            <svg viewBox="0 0 36 36" class="circular-chart">
+                                <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                <path class="circle quality" stroke-dasharray="${setting.quality_score}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            </svg>
+                            <div class="metric-number">${setting.quality_score}</div>
+                        </div>
+                        <span class="metric-label">Quality</span>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-circle">
+                            <svg viewBox="0 0 36 36" class="circular-chart">
+                                <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                <path class="circle volume" stroke-dasharray="${setting.volume_score}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            </svg>
+                            <div class="metric-number">${setting.volume_score}</div>
+                        </div>
+                        <span class="metric-label">Volume</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        document.getElementById('campaign').addEventListener('change', (e) => {
+            formData.campaign = e.target.value;
+            if (formData.campaign) {
+                document.getElementById('transferSettingsContainer').style.display = 'block';
+                updateSliderLabels(formData.campaign);
+            } else {
+                document.getElementById('transferSettingsContainer').style.display = 'none';
+            }
+        });
+
+        document.getElementById('qualitySlider').addEventListener('input', (e) => {
+            const index = parseInt(e.target.value);
+            formData.transferSettingsId = currentTransferSettings[index].id;
+
+            const labels = document.querySelectorAll('#sliderLabels span');
+            labels.forEach((label, i) => {
+                label.className = i === index ? 'active' : '';
+            });
+
+            updateTransferInfoBox();
+        });
+
+        document.querySelectorAll('input[name="setupType"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                formData.setupType = e.target.value;
+                document.getElementById('closerSection').style.display = e.target.value === 'separate' ? 'block' : 'none';
+            });
+        });
+
+        document.getElementById('addCampaignForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Submitting...';
+
+            const formDataObj = new FormData(e.target);
+            const data = {
+                campaign: formData.campaign,
+                modelName: formData.modelName,
+                transferSettingsId: formData.transferSettingsId,
+                numberOfBots: formDataObj.get('numberOfBots'),
+                setupType: formDataObj.get('setupType'),
+                primaryIpValidation: formDataObj.get('primaryIpValidation'),
+                primaryAdminLink: formDataObj.get('primaryAdminLink'),
+                primaryUser: formDataObj.get('primaryUser'),
+                primaryPassword: formDataObj.get('primaryPassword'),
+                primaryBotsCampaign: formDataObj.get('primaryBotsCampaign'),
+                primaryUserSeries: formDataObj.get('primaryUserSeries'),
+                primaryPort: formDataObj.get('primaryPort') || '5060',
+                closerIpValidation: formDataObj.get('closerIpValidation'),
+                closerAdminLink: formDataObj.get('closerAdminLink'),
+                closerUser: formDataObj.get('closerUser'),
+                closerPassword: formDataObj.get('closerPassword'),
+                closerCampaign: formDataObj.get('closerCampaign'),
+                closerIngroup: formDataObj.get('closerIngroup'),
+                closerPort: formDataObj.get('closerPort') || '5060',
+                customRequirements: formDataObj.get('customRequirements')
+            };
+
+            try {
+                const response = await fetch(window.location.href, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage('success', result.message);
+                } else {
+                    showMessage('error', result.message || 'An error occurred.');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('error', 'An error occurred. Please try again.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-send-fill"></i> Submit Campaign Request';
+            }
+        });
+    </script>
+</body>
+</html>

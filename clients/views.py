@@ -629,26 +629,26 @@ def integration_request(request):
         # This maps campaign names to their available models with transfer settings
         campaign_config = {}
         for campaign in campaigns:
-            # Get all unique models available for this campaign with their transfer settings
+            # Get all unique models available for this campaign
             campaign_models = CampaignModel.objects.filter(
                 campaign=campaign
-            ).select_related('model', 'model__transfer_settings').values(
-                'model__name',
-                'model__transfer_settings__id',
-                'model__transfer_settings__name'
-            ).distinct()
+            ).select_related('model').prefetch_related('model__transfer_settings')
             
             # Group by model name and collect transfer settings
             models_dict = {}
             for cm in campaign_models:
-                model_name = cm['model__name']
+                model_name = cm.model.name
                 if model_name not in models_dict:
                     models_dict[model_name] = []
-                if cm['model__transfer_settings__id']:
-                    models_dict[model_name].append({
-                        'id': cm['model__transfer_settings__id'],
-                        'name': cm['model__transfer_settings__name']
-                    })
+                
+                # Get all transfer settings for this model
+                for ts in cm.model.transfer_settings.all():
+                    # Avoid duplicates
+                    if not any(t['id'] == ts.id for t in models_dict[model_name]):
+                        models_dict[model_name].append({
+                            'id': ts.id,
+                            'name': ts.name
+                        })
             
             campaign_config[campaign.name] = models_dict
         
@@ -742,13 +742,19 @@ def integration_request(request):
                 # Get the model associated with this transfer setting
                 # The model_name is also sent from frontend for verification
                 model_name = data.get('modelName')
-                model = Model.objects.get(
+                model = Model.objects.filter(
                     name=model_name,
                     transfer_settings=transfer_setting
-                )
+                ).first()
+                
+                if not model:
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'Model configuration not found for selected settings'
+                    }, status=400)
                 
                 # 6. Get or create CampaignModel
-                campaign_model = CampaignModel.objects.get(
+                campaign_model, created = CampaignModel.objects.get_or_create(
                     campaign=campaign,
                     model=model
                 )
@@ -838,12 +844,6 @@ def integration_request(request):
                 'message': 'Selected campaign does not exist'
             }, status=400)
         
-        except Model.DoesNotExist:
-            return JsonResponse({
-                'success': False,
-                'message': 'Model configuration not found for selected settings'
-            }, status=400)
-        
         except TransferSettings.DoesNotExist:
             return JsonResponse({
                 'success': False,
@@ -855,6 +855,226 @@ def integration_request(request):
                 'success': False,
                 'message': 'Client role not found in system. Please contact administrator.'
             }, status=500)
+        
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid JSON data'
+            }, status=400)
+        
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'An error occurred: {str(e)}'
+            }, status=500)
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method'
+    }, status=405)
+@login_required(login_url='/accounts/login/')
+@role_required([Role.CLIENT, Role.ONBOARDING, Role.ADMIN])
+def add_campaign(request):
+    """
+    Add new campaign for existing logged-in client.
+    GET: Display form with dynamic transfer settings
+    POST: Process form and create ClientCampaignModel entry
+    """
+    # Get client profile
+    if request.user.role.name in [Role.ADMIN, Role.ONBOARDING]:
+        try:
+            client = Client.objects.get(client=request.user)
+        except Client.DoesNotExist:
+            return render(request, 'clients/add_campaign.html', {
+                'error': 'Client profile not found. Please contact administrator.'
+            })
+    else:
+        try:
+            client = Client.objects.get(client=request.user)
+        except Client.DoesNotExist:
+            return render(request, 'clients/add_campaign.html', {
+                'error': 'Client profile not found. Please contact administrator.'
+            })
+    
+    if request.method == 'GET':
+        # Get all campaigns
+        campaigns = Campaign.objects.all().order_by('name')
+        
+        # Build campaign configuration for JavaScript
+        campaign_config = {}
+        for campaign in campaigns:
+            # Get all unique models available for this campaign
+            campaign_models = CampaignModel.objects.filter(
+                campaign=campaign
+            ).select_related('model').prefetch_related('model__transfer_settings')
+            
+            # Group by model name and collect transfer settings
+            models_dict = {}
+            for cm in campaign_models:
+                model_name = cm.model.name
+                if model_name not in models_dict:
+                    models_dict[model_name] = []
+                
+                # Get all transfer settings for this model
+                for ts in cm.model.transfer_settings.all():
+                    # Avoid duplicates
+                    if not any(t['id'] == ts.id for t in models_dict[model_name]):
+                        models_dict[model_name].append({
+                            'id': ts.id,
+                            'name': ts.name
+                        })
+            
+            campaign_config[campaign.name] = models_dict
+        
+        # Get all transfer settings
+        transfer_settings = TransferSettings.objects.all().order_by('display_order')
+        transfer_settings_data = []
+        for ts in transfer_settings:
+            transfer_settings_data.append({
+                'id': ts.id,
+                'name': ts.name,
+                'description': ts.description or '',
+                'is_recommended': ts.is_recommended,
+                'quality_score': ts.quality_score,
+                'volume_score': ts.volume_score,
+                'display_order': ts.display_order
+            })
+        
+        context = {
+            'client_name': client.name,
+            'campaigns': campaigns,
+            'campaign_config': json.dumps(campaign_config),
+            'transfer_settings': json.dumps(transfer_settings_data)
+        }
+        
+        return render(request, 'clients/add_campaign.html', context)
+    
+    elif request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            
+            with transaction.atomic():
+                # Get Campaign
+                campaign_name = data.get('campaign')
+                campaign = Campaign.objects.get(name=campaign_name)
+                
+                # Get Transfer Settings and Model
+                transfer_settings_id = data.get('transferSettingsId')
+                
+                if not transfer_settings_id:
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'Transfer settings selection is required'
+                    }, status=400)
+                
+                transfer_setting = TransferSettings.objects.get(id=transfer_settings_id)
+                
+                # Get the model
+                model_name = data.get('modelName')
+                model = Model.objects.filter(
+                    name=model_name,
+                    transfer_settings=transfer_setting
+                ).first()
+                
+                if not model:
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'Model configuration not found for selected settings'
+                    }, status=400)
+                
+                # Get or create CampaignModel
+                campaign_model, created = CampaignModel.objects.get_or_create(
+                    campaign=campaign,
+                    model=model
+                )
+                
+                # Create CloserDialer (if separate dialer)
+                closer_dialer = None
+                setup_type = data.get('setupType', 'same')
+                
+                if setup_type == 'separate':
+                    closer_dialer = CloserDialer.objects.create(
+                        ip_validation_link=data.get('closerIpValidation', ''),
+                        admin_link=data.get('closerAdminLink', ''),
+                        admin_username=data.get('closerUser', ''),
+                        admin_password=data.get('closerPassword', ''),
+                        closer_campaign=data.get('closerCampaign', ''),
+                        ingroup=data.get('closerIngroup', ''),
+                        port=int(data.get('closerPort', 5060))
+                    )
+                
+                # Create DialerSettings
+                dialer_settings = DialerSettings.objects.create(
+                    closer_dialer=closer_dialer
+                )
+                
+                # Create PrimaryDialer
+                primary_dialer = PrimaryDialer.objects.create(
+                    ip_validation_link=data.get('primaryIpValidation', ''),
+                    admin_link=data.get('primaryAdminLink', ''),
+                    admin_username=data.get('primaryUser', ''),
+                    admin_password=data.get('primaryPassword', ''),
+                    fronting_campaign=data.get('primaryBotsCampaign', ''),
+                    verifier_campaign=data.get('primaryUserSeries', ''),
+                    port=int(data.get('primaryPort', 5060)),
+                    dialer_settings=dialer_settings
+                )
+                
+                # Get Status
+                status, created = Status.objects.get_or_create(status_name='Pending Approval')
+                
+                # Create StatusHistory
+                status_history = StatusHistory.objects.create(
+                    status=status,
+                    start_date=datetime.now(),
+                    end_date=None
+                )
+                
+                # Create ClientCampaignModel
+                bot_count = int(data.get('numberOfBots', 0))
+                
+                client_campaign_model = ClientCampaignModel.objects.create(
+                    client=client,
+                    campaign_model=campaign_model,
+                    status_history=status_history,
+                    start_date=datetime.now(),
+                    end_date=None,
+                    is_custom=False,
+                    custom_comments='',
+                    current_remote_agents=data.get('customRequirements', ''),
+                    is_active=False,
+                    is_enabled=True,
+                    is_approved=False,
+                    dialer_settings=dialer_settings,
+                    bot_count=bot_count,
+                    long_call_scripts_active=False,
+                    disposition_set=False
+                )
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Campaign request submitted successfully! It will be reviewed by our team.',
+                    'data': {
+                        'client_name': client.name,
+                        'campaign': campaign_name,
+                        'model': model_name,
+                        'transfer_setting': transfer_setting.name,
+                        'bot_count': bot_count,
+                        'campaign_model_id': client_campaign_model.id
+                    }
+                }, status=201)
+        
+        except Campaign.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': 'Selected campaign does not exist'
+            }, status=400)
+        
+        except TransferSettings.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': 'Transfer settings not found'
+            }, status=400)
         
         except json.JSONDecodeError:
             return JsonResponse({

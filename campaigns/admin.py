@@ -658,10 +658,10 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
         """Display link to campaign dashboard for admin and onboarding users"""
         url = reverse('clients:campaign_dashboard', args=[obj.id])
         return format_html(
-            '<a href="{}" target="_blank" style="color: #417690; font-weight: bold;">View Dashboard</a>',
+            '<a href="{}" target="_blank" style="color: #417690; font-weight: bold;">Client Dashboard</a>',
             url
         )
-    view_dashboard_link.short_description = 'Dashboard'
+    view_dashboard_link.short_description = 'Client Dashboard'
 
     def has_module_permission(self, request):
         if not request.user.is_authenticated:
