@@ -1,5 +1,6 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404
+import logging
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Count, Q
 from core.decorators import role_required
@@ -27,8 +28,10 @@ from campaigns.models import (
 )
 
 
+logger = logging.getLogger(__name__)
+
 # Edit this only |
-CATEGORY_MAPPING =  {
+CATEGORY_MAPPING = {
     "greetingresponse": "Greeting Response",
     "notfeelinggood": "Not Feeling Good",
     "dnc": "Do Not Call",
@@ -43,8 +46,7 @@ CATEGORY_MAPPING =  {
     "dnq": "Do Not Qualify",
     "qualified": "Qualified",
     "neutral": "Neutral",
-    "repeatpitch": "Repeat Pitch",
-    "unknown": "Unknown"
+    "repeatpitch": "Repeat Pitch"
 }
 
 
@@ -121,38 +123,8 @@ def client_landing(request):
     return render(request, 'clients/client_landing.html', context)
 
 
-import logging
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, get_object_or_404
-from django.http import JsonResponse
-from django.db.models import Count, Q, Max
-from core.decorators import role_required
-from accounts.models import Role
-from .models import Client
-from campaigns.models import ClientCampaignModel, ResponseCategory
-from calls.models import Call
-from datetime import datetime
 
-logger = logging.getLogger(__name__)
 
-# Edit this only |
-CATEGORY_MAPPING = {
-    "greetingresponse": "Greeting Response",
-    "notfeelinggood": "Not Feeling Good",
-    "dnc": "Do Not Call",
-    "honeypot_hardcoded": "Honeypot",
-    "honeypot": "Honeypot",
-    "spanishanswermachine": "Spanish Answering Machine",
-    "answermachine": "Answering Machine",
-    "already": "Already Customer",
-    "rebuttal": "Rebuttal",
-    "notinterested": "Not Interested",
-    "busy": "Busy",
-    "dnq": "Do Not Qualify",
-    "qualified": "Qualified",
-    "neutral": "Neutral",
-    "repeatpitch": "Repeat Pitch"
-}
 
 
 @login_required(login_url='/accounts/login/')
@@ -225,7 +197,7 @@ def campaign_dashboard(request, campaign_id):
             latest_calls_by_number = Call.objects.filter(
                 client_campaign_model=campaign
             ).values('number').annotate(
-                max_stage=Max('stage')
+                max_stage=max('stage')
             )
             
             # Build a dict for quick lookup
@@ -481,7 +453,7 @@ def campaign_dashboard(request, campaign_id):
         return render(request, 'clients/campaign_dashboard.html', {
             'error': f'An unexpected error occurred. Please contact support. Error: {str(e)}'
         })
-    
+        
 @login_required(login_url='/accounts/login/')
 @role_required([Role.CLIENT, Role.ONBOARDING, Role.ADMIN])
 def campaign_recordings(request, campaign_id):

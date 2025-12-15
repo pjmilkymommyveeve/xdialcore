@@ -146,7 +146,7 @@
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
                         {% for category in all_categories %}
                         <div class="flex items-center space-x-2">
-                            <input type="checkbox" name="categories" value="{{ category.id }}" id="cat-{{ category.id }}" class="custom-checkbox category-checkbox" {% if category.id in filters.selected_categories %}checked{% endif %}>
+                            <input type="checkbox" name="categories" value="{{ category.original_name }}" id="cat-{{ forloop.counter }}" class="custom-checkbox category-checkbox" {% if category.original_name in filters.selected_categories %}checked{% endif %}>
                             <label for="cat-{{ category.id }}" class="text-sm font-medium cursor-pointer flex items-center gap-1">
                                 <span class="inline-block w-3 h-3 rounded-full" style="background-color: {{ category.color }}"></span>
                                 {{ category.name }} ({{ category.count }})
