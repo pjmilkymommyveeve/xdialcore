@@ -519,7 +519,7 @@ def campaign_recordings(request, campaign_id):
 @login_required(login_url='/accounts/login/')
 @role_required([Role.CLIENT, Role.ONBOARDING, Role.ADMIN])
 def data_export(request, campaign_id):
-    """Data export page with combined category mapping - FIXED VERSION WITH COMPLETE LOGGING"""
+    """Data export page with combined category mapping - COMPLETE FIX"""
     logger.info(f"=== DATA EXPORT START === User: {request.user.username}, Campaign: {campaign_id}, Method: {request.method}")
     
     try:
@@ -613,14 +613,17 @@ def data_export(request, campaign_id):
                     # Get the combined name from mapping (lowercase key)
                     combined_name = CATEGORY_MAPPING.get(original_name, original_name)
                     
+                    logger.debug(f"Checking category: DB={db_category.name}, normalized={original_name}, mapped={combined_name}")
+                    
                     # Case-insensitive comparison
                     if combined_name.lower().strip() in selected_lower:
                         original_category_ids.append(db_category.id)
-                        logger.debug(f"Matched category: {db_category.name} -> {combined_name}")
+                        logger.debug(f"✓ MATCHED category: {db_category.name} (ID: {db_category.id}) -> {combined_name}")
                 
-                logger.debug(f"Matched category IDs: {original_category_ids}")
+                logger.info(f"Matched {len(original_category_ids)} category IDs: {original_category_ids}")
                 if original_category_ids:
                     calls = calls.filter(response_category__id__in=original_category_ids)
+                    logger.info(f"Filtered calls count after category filter: {calls.count()}")
             
             start_date = export_data.get('start_date')
             start_time = export_data.get('start_time')
@@ -662,7 +665,10 @@ def data_export(request, campaign_id):
                 if call.number in latest_stages and call.stage == latest_stages[call.number]:
                     filtered_calls.append(call)
             
-            logger.info(f"Total calls after latest stage filter: {len(filtered_calls)}")
+            logger.info(f"✓ FINAL: Total calls after latest stage filter: {len(filtered_calls)}")
+            
+            if len(filtered_calls) == 0:
+                logger.warning("No calls matched the filters!")
             
             # Create CSV
             logger.info("Creating CSV response...")
@@ -681,7 +687,7 @@ def data_export(request, campaign_id):
                 original_category_name = call.response_category.name if call.response_category else 'Unknown'
                 # Use lowercase for lookup in mapping
                 combined_category_name = CATEGORY_MAPPING.get(
-                    original_category_name.lower() if original_category_name else 'unknown',
+                    original_category_name.lower().strip() if original_category_name else 'unknown',
                     original_category_name
                 )
                 
@@ -697,7 +703,7 @@ def data_export(request, campaign_id):
                     call.transcription or ''
                 ])
             
-            logger.info(f"CSV export successful: {len(filtered_calls)} records")
+            logger.info(f"✓ CSV export successful: {len(filtered_calls)} records written")
             return response
         
         except json.JSONDecodeError as e:
@@ -777,7 +783,7 @@ def data_export(request, campaign_id):
                 cat_name = (call.response_category.name or 'UNKNOWN').lower().strip()
                 category_count_dict[cat_name] = category_count_dict.get(cat_name, 0) + 1
         
-        logger.debug(f"Category counts: {category_count_dict}")
+        logger.debug(f"Category counts (raw): {category_count_dict}")
         
         # Combine categories according to mapping
         logger.info("Combining categories according to mapping...")
@@ -808,6 +814,7 @@ def data_export(request, campaign_id):
             })
         
         logger.info(f"Built {len(all_categories)} categories for display")
+        logger.info(f"Total records (latest stage only): {len(latest_stage_calls)}")
         
         context = {
             'client_name': client.name,
@@ -818,6 +825,7 @@ def data_export(request, campaign_id):
             },
             'list_ids': list(list_ids),
             'all_categories': all_categories,
+            'total_records': len(latest_stage_calls),  # Add this for template
         }
         
         logger.info(f"Rendering data_export.html with {len(list_ids)} list_ids and {len(all_categories)} categories")
@@ -835,6 +843,7 @@ def data_export(request, campaign_id):
             },
             'list_ids': [],
             'all_categories': [],
+            'total_records': 0,
         })
     
 def integration_request(request):
