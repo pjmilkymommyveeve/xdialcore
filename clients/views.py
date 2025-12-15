@@ -28,45 +28,22 @@ from campaigns.models import (
 
 
 # Edit this only |
-CATEGORY_MAPPING = {
-    "ANSWER_MACHINE_greeting": "Answering Machine",
-    "ANSWER_MACHINE": "Answering Machine",
-    "ANSWER_MACHINE_hello": "Answering Machine",
-
-    "DO_NOT_CALL": "Do Not Call",
-    "DO_NOT_CALL_greeting": "Do Not Call",
-    "DO_NOT_CALL_hello": "Do Not Call",
-
-    "DNQ": "Do Not Qualify",
-
-    "NOT_INTERESTED": "Not Interested",
-    "NOT_INTERESTED_transfer": "Not Interested",
-
-    "Not_Responding": "Not Responding",
-    "Not_Responding_greeting": "Not Responding",
-    "Not_Responding_hello": "Not Responding",
-
-    "neutral_keywords": "Neutral",
-    "already_keywords": "Neutral",
-    "busy_keywords": "Neutral",
-    "rebuttal_keywords": "Neutral",
-
-    "INTERESTED": "Interested",
-    "INTERESTED_transfer": "Interested",
-
-    "UNKNOWN_hello": "Unknown",
-    "UNKNOWN_greeting": "Unknown",
-    "UNKNOWN": "Unknown",
-    "UNKNOWN_transfer": "Unknown",
-
-    "User_Silent_hello": "User Silent",
-    "User_Silent_greeting": "User Silent",
-    "User Slient": "User Silent",  
-
-    "Honeypot_K_hello": "Honeypot",
-    "Honeypot_K_greeting": "Honeypot",
-    "Honeypot_K": "Honeypot",
-    "Honeypot_S": "Honeypot",
+CATEGORY_MAPPING =  {
+    "greetingresponse": "Greeting Response",
+    "notfeelinggood": "Not Feeling Good",
+    "dnc": "Do Not Call",
+    "honeypot_hardcoded": "Honeypot",
+    "honeypot": "Honeypot",
+    "spanishanswermachine": "Spanish Answering Machine",
+    "answermachine": "Answering Machine",
+    "already": "Already Customer",
+    "rebuttal": "Rebuttal",
+    "notinterested": "Not Interested",
+    "busy": "Busy",
+    "dnq": "Do Not Qualify",
+    "qualified": "Qualified",
+    "neutral": "Neutral",
+    "repeatpitch": "Repeat Pitch"
 }
 
 
