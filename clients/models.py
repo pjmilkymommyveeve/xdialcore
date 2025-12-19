@@ -10,7 +10,6 @@ class Client(models.Model):
         related_name='client_profile'
     )
     name = models.CharField(max_length=255)
-    is_archived = models.BooleanField(default=False)
     
     class Meta:
         db_table = 'clients'
@@ -18,7 +17,6 @@ class Client(models.Model):
         verbose_name_plural = 'Clients'
         indexes = [
             models.Index(fields=['name'], name='idx_clients_name'),
-            models.Index(fields=['is_archived'], name='idx_clients_is_archived'),
         ]
     
     def __str__(self):

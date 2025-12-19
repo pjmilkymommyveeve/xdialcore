@@ -23,7 +23,6 @@ class TransferSettings(models.Model):
         return self.name
 
 
-
 class Model(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
@@ -43,6 +42,8 @@ class Model(models.Model):
     
     def __str__(self):
         return self.name
+
+
 class Campaign(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
@@ -139,6 +140,13 @@ class StatusHistory(models.Model):
         on_delete=models.RESTRICT,
         related_name='history'
     )
+    client_campaign = models.ForeignKey(
+        'ClientCampaignModel',
+        on_delete=models.CASCADE,
+        related_name='status_history',
+        null=True,
+        blank=True
+    )
     start_date = models.DateTimeField()
     end_date = models.DateTimeField(blank=True, null=True)
     
@@ -146,15 +154,16 @@ class StatusHistory(models.Model):
         db_table = 'status_history'
         verbose_name = 'Status History'
         verbose_name_plural = 'Status History'
+        ordering = ['-start_date']  # Show newest first
         indexes = [
             models.Index(fields=['status'], name='idx_status_history_status_id'),
+            models.Index(fields=['client_campaign'], name='idx_status_history_campaign_id'),
             models.Index(fields=['start_date'], name='idx_status_history_start_date'),
             models.Index(fields=['end_date'], name='idx_status_history_end_date'),
         ]
     
     def __str__(self):
         return f"{self.status.status_name} - {self.start_date}"
-
 
 class PrimaryDialer(models.Model):
     ip_validation_link = models.CharField(max_length=500, blank=True, null=True)
@@ -238,21 +247,13 @@ class ClientCampaignModel(models.Model):
         on_delete=models.RESTRICT,
         related_name='client_associations'
     )
-    status_history = models.ForeignKey(
-        StatusHistory,
-        on_delete=models.SET_NULL,
-        related_name='client_campaigns',
-        blank=True,
-        null=True
-    )
+    
     start_date = models.DateTimeField()
     end_date = models.DateTimeField(blank=True, null=True)
     is_custom = models.BooleanField(default=False)
     custom_comments = models.TextField(blank=True, null=True)
     current_remote_agents = models.TextField(blank=True, null=True)
     is_active = models.BooleanField(default=False)
-    is_enabled = models.BooleanField(default=True)
-    is_approved = models.BooleanField(default=False)
     # Dialer configuration
     dialer_settings = models.ForeignKey(
         DialerSettings,
@@ -265,6 +266,16 @@ class ClientCampaignModel(models.Model):
     long_call_scripts_active = models.BooleanField(default=False, help_text="Are long call scripts active?")
     disposition_set = models.BooleanField(default=False, help_text="Is disposition set configured?")
     
+    def current_status_history(self):
+        """Get the current (active) status history entry"""
+        return self.status_history.filter(end_date__isnull=True).first()
+    
+    @property
+    def current_status(self):
+        """Get the current status"""
+        current = self.current_status_history
+        return current.status if current else None
+    
     class Meta:
         db_table = 'client_campaign_model'
         verbose_name = 'Client Campaign'
@@ -273,8 +284,6 @@ class ClientCampaignModel(models.Model):
             models.Index(fields=['client'], name='idx_ccm_client'),
             models.Index(fields=['campaign_model'], name='idx_ccm_camp_model'),
             models.Index(fields=['is_active'], name='idx_ccm_active'),
-            models.Index(fields=['is_enabled'], name='idx_ccm_enabled'),
-            models.Index(fields=['is_approved'], name='idx_ccm_approved'),
             models.Index(fields=['start_date'], name='idx_ccm_start'),
             models.Index(fields=['end_date'], name='idx_ccm_end'),
             models.Index(fields=['bot_count'], name='idx_ccm_bot_count'),
@@ -314,3 +323,5 @@ class ServerCampaignBots(models.Model):
     
     def __str__(self):
         return f"{self.server} - {self.client_campaign_model}"
+
+

@@ -4,6 +4,7 @@ from django.utils import timezone
 from django.db import transaction
 from django.urls import reverse
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from .models import (
     TransferSettings,
     Model,
@@ -224,7 +225,9 @@ class ModelAdmin(admin.ModelAdmin):
         return super().formfield_for_manytomany(db_field, request, **kwargs)
 
     def has_module_permission(self, request):
-        return True
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
 
     def has_view_permission(self, request, obj=None):
         if not request.user.is_authenticated:
@@ -466,7 +469,7 @@ class DialerSettingsAdmin(admin.ModelAdmin):
 class StatusAdmin(admin.ModelAdmin):
     list_display = ['status_name', 'updated_at']
     search_fields = ['status_name']
-    readonly_fields = ['status_name', 'updated_at']
+    readonly_fields = ['updated_at']
 
     def has_module_permission(self, request):
         if not request.user.is_authenticated:
@@ -476,7 +479,7 @@ class StatusAdmin(admin.ModelAdmin):
     def has_view_permission(self, request, obj=None):
         if not request.user.is_authenticated:
             return False
-        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding or request.user.is_qa
 
     def has_add_permission(self, request):
         if not request.user.is_authenticated:
@@ -496,13 +499,58 @@ class StatusAdmin(admin.ModelAdmin):
 
 @admin.register(StatusHistory)
 class StatusHistoryAdmin(admin.ModelAdmin):
-    list_display = ['status', 'start_date', 'end_date']
-    list_filter = ['status', 'start_date']
-    search_fields = ['status__status_name']
-    readonly_fields = ['status', 'start_date', 'end_date']
+    list_display = ['status', 'get_client_campaign', 'start_date', 'end_date', 'duration']
+    list_filter = ['status', 'start_date', 'end_date']
+    search_fields = ['status__status_name', 'client_campaigns__client__name']
+    readonly_fields = ['status', 'start_date', 'end_date', 'get_client_campaign', 'duration']
     date_hierarchy = 'start_date'
     
+    fieldsets = (
+        ('Status Information', {
+            'fields': ('status', 'get_client_campaign')
+        }),
+        ('Timeline', {
+            'fields': ('start_date', 'end_date', 'duration')
+        }),
+    )
+    
+    def get_client_campaign(self, obj):
+        """Show which client campaign this history belongs to"""
+        if obj.client_campaign:
+            campaign = obj.client_campaign
+            url = reverse('admin:campaigns_clientcampaignmodel_change', args=[campaign.pk])
+            return format_html(
+                '<a href="{}">{} - {}</a>',
+                url,
+                campaign.client.name,
+                campaign.campaign_model
+            )
+        return "No associated campaign"
+    get_client_campaign.short_description = 'Client Campaign'
+    
+    def duration(self, obj):
+        """Calculate how long this status was active"""
+        if obj.end_date:
+            delta = obj.end_date - obj.start_date
+            days = delta.days
+            hours = delta.seconds // 3600
+            minutes = (delta.seconds % 3600) // 60
+            
+            parts = []
+            if days > 0:
+                parts.append(f"{days} day{'s' if days != 1 else ''}")
+            if hours > 0:
+                parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+            if minutes > 0 or not parts:
+                parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+            
+            return ", ".join(parts)
+        return "Currently active"
+    duration.short_description = 'Duration'
+    
     def has_module_permission(self, request):
+        if not request.user.is_authenticated:
+            return False
         return False
     
     def has_view_permission(self, request, obj=None):
@@ -511,27 +559,32 @@ class StatusHistoryAdmin(admin.ModelAdmin):
         return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding or request.user.is_qa
     
     def has_add_permission(self, request):
-        if not request.user.is_authenticated:
-            return False
-        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+        return False  # Status history should only be created automatically
     
     def has_change_permission(self, request, obj=None):
-        return False
+        return False  # Status history should not be manually edited
     
     def has_delete_permission(self, request, obj=None):
         if not request.user.is_authenticated:
             return False
         return request.user.is_superuser or request.user.is_admin
 
-
 # ============================================================================
 # SECTION 6: CLIENT CAMPAIGNS (Main Interface)
 # ============================================================================
 
 class ClientCampaignModelForm(forms.ModelForm):
+
+    status = forms.ModelChoiceField(
+        queryset=Status.objects.all(),
+        required=True,
+        help_text="Select the status for this campaign"
+    )
+
     class Meta:
         model = ClientCampaignModel
-        exclude = ['status_history']
+        fields = '__all__'
+        exclude = []
         widgets = {
             'custom_comments': forms.Textarea(attrs={'rows': 3}),
             'current_remote_agents': forms.Textarea(attrs={'rows': 3}),
@@ -539,21 +592,38 @@ class ClientCampaignModelForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['client'].queryset = Client.objects.filter(is_archived=False).select_related('client').order_by('name')
+        self.fields['client'].queryset = Client.objects.select_related('client').order_by('name')
         self.fields['campaign_model'].queryset = CampaignModel.objects.select_related('campaign', 'model').order_by('campaign__name', 'model__name')
         self.fields['campaign_model'].label_from_instance = lambda obj: f"{obj.campaign.name} - {obj.model.name}"
         self.fields['dialer_settings'].queryset = DialerSettings.objects.select_related('closer_dialer').prefetch_related('primary_dialers').order_by('-id')
         
-        if not self.instance.pk:
+        # If editing an existing instance
+        if self.instance.pk:
+            # Make client field readonly for existing instances
+            self.fields['client'].disabled = True
+            self.fields['client'].help_text = "Client cannot be changed after creation"
+            
+            # Set current status from status_history
+            current_history = self.instance.status_history.filter(end_date__isnull=True).first()
+            if current_history:
+                self.initial['status'] = current_history.status
+                self.fields['status'].initial = current_history.status
+        else:
+            # For new instances, set default values
             self.initial['start_date'] = timezone.now()
-            self.initial['is_enabled'] = True
+            # Set default status to "Not Approved"
+            try:
+                not_approved_status = Status.objects.get(status_name='Not Approved')
+                self.initial['status'] = not_approved_status
+                self.fields['status'].initial = not_approved_status
+            except Status.DoesNotExist:
+                pass
+    
         
-        self.fields['client'].help_text = "Select the client (only non-archived clients shown)"
+        self.fields['client'].help_text = "Select the client" if not self.instance.pk else "Client cannot be changed after creation"
         self.fields['campaign_model'].help_text = "Select campaign and model combination"
         self.fields['dialer_settings'].help_text = "Select or create dialer settings (use Dialer Settings menu to manage)"
         self.fields['is_active'].help_text = "Is this campaign currently running?"
-        self.fields['is_enabled'].help_text = "Is this configuration enabled for use?"
-        self.fields['is_approved'].help_text = "Has this campaign been approved?"
         self.fields['is_custom'].help_text = "Check if this is a custom configuration"
         self.fields['bot_count'].help_text = "Number of bots for this campaign"
         self.fields['long_call_scripts_active'].help_text = "Are long call scripts active?"
@@ -564,10 +634,6 @@ class ClientCampaignModelForm(forms.ModelForm):
         start_date = cleaned_data.get('start_date')
         end_date = cleaned_data.get('end_date')
         is_active = cleaned_data.get('is_active')
-        client = cleaned_data.get('client')
-
-        if client and client.is_archived:
-            raise forms.ValidationError({'client': "Cannot assign campaign to archived client"})
 
         if end_date and start_date and end_date < start_date:
             raise forms.ValidationError({'end_date': "End date cannot be before start date"})
@@ -577,36 +643,88 @@ class ClientCampaignModelForm(forms.ModelForm):
 
         return cleaned_data
 
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        new_status = self.cleaned_data.get('status')
+        
+        # Store the new status on the instance so we can save it later
+        instance._new_status = new_status
+        
+        if commit:
+            with transaction.atomic():
+                instance.save()
+                
+                # Get current status
+                current_history = instance.status_history.filter(end_date__isnull=True).first()
+                old_status = current_history.status if current_history else None
+                
+                # Update status if changed or new
+                if old_status != new_status:
+                    # Close old status history if it exists
+                    if current_history:
+                        current_history.end_date = timezone.now()
+                        current_history.save()
+                    
+                    # Create new status history
+                    StatusHistory.objects.create(
+                        client_campaign=instance,
+                        status=new_status,
+                        start_date=timezone.now()
+                    )
+                
+                self.save_m2m()
+        
+        return instance
+    
+class CurrentStatusFilter(admin.SimpleListFilter):
+    title = 'current status'
+    parameter_name = 'current_status'
 
+    def lookups(self, request, model_admin):
+        """Return list of statuses to filter by"""
+        statuses = Status.objects.all().order_by('status_name')
+        return [(status.id, status.status_name) for status in statuses]
+
+    def queryset(self, request, queryset):
+        """Filter queryset based on selected status"""
+        if self.value():
+            # Get all ClientCampaignModel IDs that have this status as current
+            status_id = self.value()
+            campaign_ids = StatusHistory.objects.filter(
+                status_id=status_id,
+                end_date__isnull=True  # Only current/active statuses
+            ).values_list('client_campaign_id', flat=True)
+            
+            return queryset.filter(id__in=campaign_ids)
+        return queryset
+    
 @admin.register(ClientCampaignModel)
 class ClientCampaignModelAdmin(admin.ModelAdmin):
     form = ClientCampaignModelForm
     inlines = [ServerCampaignBotsInline]
-    readonly_fields = ['status_history']
+    readonly_fields = ['get_status_history_display']
     
     list_display = [
         'id', 
         'get_client_name', 
         'get_campaign', 
-        'get_model', 
+        'get_model',
+        'get_current_status',
         'is_active', 
-        'is_enabled', 
-        'is_approved', 
         'bot_count', 
         'start_date',
         'view_dashboard_link'
     ]
     list_filter = [
+        CurrentStatusFilter,
         'is_active', 
-        'is_enabled', 
-        'is_approved', 
         'is_custom', 
         'long_call_scripts_active', 
         'disposition_set', 
         'start_date',
         'campaign_model__campaign',
         'campaign_model__model',
-        'client'
+        'client',
     ]
     search_fields = [
         'id', 
@@ -624,7 +742,7 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
             'fields': ('client', 'campaign_model', 'start_date', 'end_date')
         }),
         ('Status', {
-            'fields': ('is_active', 'is_enabled', 'is_approved', 'status_history')
+            'fields': ('status', 'is_active', 'get_status_history_display')
         }),
         ('Campaign Configuration', {
             'fields': ('bot_count', 'long_call_scripts_active', 'disposition_set'),
@@ -638,6 +756,35 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
             'description': 'Select existing configuration or create new via the Dialer Settings admin section'
         }),
     )
+
+    def save_model(self, request, obj, form, change):
+        """Override to handle status updates when commit=False is used with inlines"""
+        if hasattr(obj, '_new_status'):
+            new_status = obj._new_status
+            
+            with transaction.atomic():
+                # Save the object first
+                super().save_model(request, obj, form, change)
+                
+                # Get current status
+                current_history = obj.status_history.filter(end_date__isnull=True).first()
+                old_status = current_history.status if current_history else None
+                
+                # Update status if changed or new
+                if old_status != new_status:
+                    # Close old status history if it exists
+                    if current_history:
+                        current_history.end_date = timezone.now()
+                        current_history.save()
+                    
+                    # Create new status history
+                    StatusHistory.objects.create(
+                        client_campaign=obj,
+                        status=new_status,
+                        start_date=timezone.now()
+                    )
+        else:
+            super().save_model(request, obj, form, change)
 
     def get_client_name(self, obj):
         return obj.client.name
@@ -653,6 +800,38 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
         return obj.campaign_model.model.name
     get_model.short_description = 'Model'
     get_model.admin_order_field = 'campaign_model__model__name'
+
+    def get_current_status(self, obj):
+        """Display current status with color coding"""
+        current_history = obj.status_history.filter(end_date__isnull=True).first()
+        if current_history:
+            status_name = current_history.status.status_name
+            color_map = {
+                'Not Approved': '#999999',
+                'Enabled': '#28a745',
+                'Disabled': '#dc3545',
+                'Archived': '#6c757d'
+            }
+            color = color_map.get(status_name, '#007bff')
+            return format_html(
+                '<span style="color: {}; font-weight: bold;">{}</span>',
+                color,
+                status_name
+            )
+        return mark_safe('<span style="color: #999999;">No Status</span>')
+    
+    def get_status_history_display(self, obj):
+        """Display link to view full status history"""
+        if obj.pk:
+            url = reverse('admin:campaigns_statushistory_changelist')
+            # Add filter parameter to show only this campaign's history
+            filter_url = f"{url}?client_campaign__id__exact={obj.pk}"
+            return format_html(
+                '<a class="button" href="{}" target="_blank">View Status History</a>',
+                filter_url
+            )
+        return "Save to view history"
+    get_status_history_display.short_description = 'Status History'
 
     def view_dashboard_link(self, obj):
         """Display link to campaign dashboard for admin and onboarding users"""
@@ -711,10 +890,34 @@ class ServerCampaignBotsAdmin(admin.ModelAdmin):
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "client_campaign_model":
-            kwargs["queryset"] = ClientCampaignModel.objects.filter(
-                client__is_archived=False
-            ).select_related('client', 'campaign_model__campaign', 'campaign_model__model')
+            kwargs["queryset"] = ClientCampaignModel.objects.select_related(
+                'client', 'campaign_model__campaign', 'campaign_model__model'
+            ).order_by('client__name')
+        if db_field.name == "server":
+            kwargs["queryset"] = Server.objects.order_by('alias', 'ip')
+        if db_field.name == "extension":
+            kwargs["queryset"] = Extension.objects.order_by('extension_number')
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def has_module_permission(self, request):
-        return
+        return False
+
+    def has_view_permission(self, request, obj=None):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+
+    def has_add_permission(self, request):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+
+    def has_change_permission(self, request, obj=None):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+
+    def has_delete_permission(self, request, obj=None):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin

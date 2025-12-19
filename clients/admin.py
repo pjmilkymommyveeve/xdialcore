@@ -26,7 +26,7 @@ class ClientCreationForm(forms.ModelForm):
     
     class Meta:
         model = Client
-        fields = ['name', 'is_archived']
+        fields = ['name']
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -105,7 +105,7 @@ class ClientEditForm(forms.ModelForm):
     
     class Meta:
         model = Client
-        fields = ['name', 'is_archived']
+        fields = ['name']
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -116,8 +116,7 @@ class ClientEditForm(forms.ModelForm):
 
 @admin.register(Client)
 class ClientAdmin(admin.ModelAdmin):
-    list_display = ['name', 'get_username', 'is_archived']
-    list_filter = ['is_archived']
+    list_display = ['name', 'get_username']
     search_fields = ['name', 'client__username']
     
     def get_form(self, request, obj=None, **kwargs):
@@ -140,7 +139,7 @@ class ClientAdmin(admin.ModelAdmin):
                     'description': 'Create login credentials for the client'
                 }),
                 ('Client Information', {
-                    'fields': ('name', 'is_archived')
+                    'fields': ('name',)
                 }),
             )
         else:
@@ -151,7 +150,7 @@ class ClientAdmin(admin.ModelAdmin):
                     'description': 'User account information'
                 }),
                 ('Client Information', {
-                    'fields': ('name', 'is_archived')
+                    'fields': ('name',)
                 }),
             )
     

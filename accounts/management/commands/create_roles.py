@@ -4,11 +4,12 @@ from accounts.models import Role
 
 class Command(BaseCommand):
     help = 'Create initial roles'
-
+    
     def handle(self, *args, **kwargs):
         roles = [
             Role.ADMIN,
             Role.CLIENT,
+            Role.CLIENT_MEMBER,
             Role.ONBOARDING,
             Role.QA,
         ]

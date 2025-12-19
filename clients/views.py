@@ -1101,6 +1101,7 @@ def integration_request(request):
         'success': False,
         'message': 'Invalid request method'
     }, status=405)
+
 @login_required(login_url='/accounts/login/')
 @role_required([Role.CLIENT, Role.ONBOARDING, Role.ADMIN])
 def add_campaign(request):

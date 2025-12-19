@@ -5,12 +5,14 @@ from django.db import models
 class Role(models.Model):
     ADMIN = 'admin'
     CLIENT = 'client'
+    CLIENT_MEMBER = 'client_member'
     ONBOARDING = 'onboarding'
     QA = 'qa'
     
     ROLE_CHOICES = [
         (ADMIN, 'Admin'),
         (CLIENT, 'Client'),
+        (CLIENT_MEMBER, 'Client Member'),
         (ONBOARDING, 'Onboarding'),
         (QA, 'QA'),
     ]
@@ -75,10 +77,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.role.name == Role.CLIENT
     
     @property
+    def is_client_member(self):
+        return self.role.name == Role.CLIENT_MEMBER
+    
+    @property
     def is_onboarding(self):
         return self.role.name == Role.ONBOARDING
     
     @property
     def is_qa(self):
         return self.role.name == Role.QA
-
