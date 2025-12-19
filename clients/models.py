@@ -10,6 +10,7 @@ class Client(models.Model):
         related_name='client_profile'
     )
     name = models.CharField(max_length=255)
+    assembly_api_key = models.CharField(max_length=32)
     
     class Meta:
         db_table = 'clients'
