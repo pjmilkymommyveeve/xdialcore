@@ -247,6 +247,14 @@ class ClientCampaignModel(models.Model):
         on_delete=models.RESTRICT,
         related_name='client_associations'
     )
+    selected_transfer_setting = models.ForeignKey(
+        TransferSettings,
+        on_delete=models.RESTRICT,
+        related_name='client_campaigns_using',
+        blank=True,
+        null=True,
+        help_text="The specific transfer setting selected for this client campaign"
+    )
     
     start_date = models.DateTimeField()
     end_date = models.DateTimeField(blank=True, null=True)

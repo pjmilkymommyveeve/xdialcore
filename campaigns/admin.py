@@ -597,6 +597,18 @@ class ClientCampaignModelForm(forms.ModelForm):
         self.fields['campaign_model'].label_from_instance = lambda obj: f"{obj.campaign.name} - {obj.model.name}"
         self.fields['dialer_settings'].queryset = DialerSettings.objects.select_related('closer_dialer').prefetch_related('primary_dialers').order_by('-id')
         
+        if 'campaign_model' in self.data:
+            try:
+                campaign_model_id = int(self.data.get('campaign_model'))
+                campaign_model = CampaignModel.objects.get(id=campaign_model_id)
+                self.fields['selected_transfer_setting'].queryset = campaign_model.model.transfer_settings.all()
+            except (ValueError, TypeError, CampaignModel.DoesNotExist):
+                self.fields['selected_transfer_setting'].queryset = TransferSettings.objects.none()
+        elif self.instance.pk and self.instance.campaign_model:
+            self.fields['selected_transfer_setting'].queryset = self.instance.campaign_model.model.transfer_settings.all()
+        else:
+            self.fields['selected_transfer_setting'].queryset = TransferSettings.objects.none()
+
         # If editing an existing instance
         if self.instance.pk:
             # Make client field readonly for existing instances
@@ -623,6 +635,7 @@ class ClientCampaignModelForm(forms.ModelForm):
         self.fields['client'].help_text = "Select the client" if not self.instance.pk else "Client cannot be changed after creation"
         self.fields['campaign_model'].help_text = "Select campaign and model combination"
         self.fields['dialer_settings'].help_text = "Select or create dialer settings (use Dialer Settings menu to manage)"
+        self.fields['selected_transfer_setting'].help_text = "Select transfer setting from available options for this model"
         self.fields['is_active'].help_text = "Is this campaign currently running?"
         self.fields['is_custom'].help_text = "Check if this is a custom configuration"
         self.fields['bot_count'].help_text = "Number of bots for this campaign"
@@ -634,12 +647,21 @@ class ClientCampaignModelForm(forms.ModelForm):
         start_date = cleaned_data.get('start_date')
         end_date = cleaned_data.get('end_date')
         is_active = cleaned_data.get('is_active')
+        campaign_model = cleaned_data.get('campaign_model')
+        selected_transfer_setting = cleaned_data.get('selected_transfer_setting')
 
         if end_date and start_date and end_date < start_date:
             raise forms.ValidationError({'end_date': "End date cannot be before start date"})
 
         if is_active and end_date:
             raise forms.ValidationError({'is_active': "Cannot be active if campaign has ended (end date is set)"})
+
+        # Validate transfer setting belongs to the model
+        if campaign_model and selected_transfer_setting:
+            if not campaign_model.model.transfer_settings.filter(id=selected_transfer_setting.id).exists():
+                raise forms.ValidationError({
+                    'selected_transfer_setting': "Selected transfer setting must be available for this campaign's model"
+                })
 
         return cleaned_data
 
@@ -709,11 +731,11 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
         'get_client_name', 
         'get_campaign', 
         'get_model',
+        'get_transfer_setting',
         'get_current_status',
         'is_active', 
         'bot_count', 
         'start_date',
-        'view_dashboard_link'
     ]
     list_filter = [
         CurrentStatusFilter,
@@ -739,7 +761,7 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Basic Information', {
-            'fields': ('client', 'campaign_model', 'start_date', 'end_date')
+            'fields': ('client', 'campaign_model', 'selected_transfer_setting', 'start_date', 'end_date')
         }),
         ('Status', {
             'fields': ('status', 'is_active', 'get_status_history_display')
@@ -833,15 +855,7 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
         return "Save to view history"
     get_status_history_display.short_description = 'Status History'
 
-    def view_dashboard_link(self, obj):
-        """Display link to campaign dashboard for admin and onboarding users"""
-        url = reverse('clients:campaign_dashboard', args=[obj.id])
-        return format_html(
-            '<a href="{}" target="_blank" style="color: #417690; font-weight: bold;">Client Dashboard</a>',
-            url
-        )
-    view_dashboard_link.short_description = 'Client Dashboard'
-
+    
     def has_module_permission(self, request):
         if not request.user.is_authenticated:
             return False
@@ -881,6 +895,12 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
             return qs.filter(client__client=request.user)
         return qs.none()
 
+    def get_transfer_setting(self, obj):
+        if obj.selected_transfer_setting:
+            return obj.selected_transfer_setting.name
+        return '-'
+    get_transfer_setting.short_description = 'Transfer Setting'
+    get_transfer_setting.admin_order_field = 'selected_transfer_setting__name'
 
 @admin.register(ServerCampaignBots)
 class ServerCampaignBotsAdmin(admin.ModelAdmin):
