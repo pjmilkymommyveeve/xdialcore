@@ -22,3 +22,29 @@ class Client(models.Model):
     
     def __str__(self):
         return self.name
+    
+class ClientEmployee(models.Model):
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.CASCADE,
+        related_name='employees'
+    )
+    user = models.OneToOneField(
+        'accounts.User',
+        on_delete=models.CASCADE,
+        related_name='employer',
+        limit_choices_to={'role__name': 'client_member'}
+    )
+    
+    class Meta:
+        db_table = 'client_employees'
+        verbose_name = 'Client Employee'
+        verbose_name_plural = 'Client Employees'
+        unique_together = [['client', 'user']]
+        indexes = [
+            models.Index(fields=['client'], name='idx_client_emp_client'),
+            models.Index(fields=['user'], name='idx_client_emp_user'),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.client.name}"
