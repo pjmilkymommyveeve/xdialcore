@@ -211,6 +211,31 @@ class ModelAdmin(admin.ModelAdmin):
     search_fields = ['name', 'description']
     filter_horizontal = ['transfer_settings']
 
+    def get_list_display(self, request):
+        """Customize list_display based on user role"""
+        base_display = [
+            'id', 
+            'get_client_name', 
+            'get_campaign', 
+            'get_model',
+            'get_transfer_setting',
+            'get_current_status',
+            'is_active', 
+            'bot_count', 
+            'start_date',
+        ]
+        
+        # QA users only see admin dashboard
+        if request.user.is_qa:
+            return base_display + ['get_admin_dashboard_link']
+        
+        # Admin and Onboarding see both dashboards
+        if request.user.is_superuser or request.user.is_admin or request.user.is_onboarding:
+            return base_display + ['get_client_dashboard_link', 'get_admin_dashboard_link']
+        
+        # Others see default
+        return base_display
+
     def get_transfer_settings(self, obj):
         """Display all transfer settings for this model"""
         settings = obj.transfer_settings.all()
@@ -736,6 +761,8 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
         'is_active', 
         'bot_count', 
         'start_date',
+        'get_client_dashboard_link',
+        'get_admin_dashboard_link',
     ]
     list_filter = [
         CurrentStatusFilter,
@@ -841,7 +868,30 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
                 status_name
             )
         return mark_safe('<span style="color: #999999;">No Status</span>')
-    
+
+    get_current_status.short_description = 'Status'
+    get_current_status.admin_order_field = 'status_history__status__status_name'
+
+    def get_client_dashboard_link(self, obj):
+        """Display link to client dashboard"""
+        if obj.pk:
+            dashboard_url = f"https://dashboard.xlitexcore.xdialnetworks.com/dashboard?campaign_id={obj.pk}"
+            return format_html(
+                '<a class="button" href="{}" target="_blank" style="background-color: #417690; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px;">Client Dashboard</a>',
+                dashboard_url
+            )
+        return "-"
+
+    get_client_dashboard_link.short_description = 'Client Dashboard'
+
+    def get_admin_dashboard_link(self, obj):
+        """Display link to admin dashboard (placeholder)"""
+        if obj.pk:
+            # Placeholder - will be implemented later
+            return mark_safe('<span style="color: #999; padding: 5px 10px;">Admin Dashboard</span>')
+        return "-"
+
+    get_admin_dashboard_link.short_description = 'Admin Dashboard'
     def get_status_history_display(self, obj):
         """Display link to view full status history"""
         if obj.pk:
