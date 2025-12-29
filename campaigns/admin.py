@@ -888,7 +888,7 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
         if obj.pk:
             dashboard_url = f"https://dashboard.xlitexcore.xdialnetworks.com/admin-dashboard?campaign_id={obj.pk}"
             return format_html(
-                '<a class="button" href="{}" target="_blank" style="background-color: #417690; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; white-space: nowrap; display: inline-block;">Client Dashboard</a>',
+                '<a class="button" href="{}" target="_blank" style="background-color: #417690; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; white-space: nowrap; display: inline-block;">Admin Dashboard</a>',
                 dashboard_url
             )
         return "-"
