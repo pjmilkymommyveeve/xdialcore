@@ -874,7 +874,7 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
     def get_client_dashboard_link(self, obj):
         """Display link to client dashboard"""
         if obj.pk:
-            dashboard_url = f"https://dashboard.xlitexcore.xdialnetworks.com/dashboard?campaign_id={obj.pk}"
+            dashboard_url = f"https://dashboard.xlitexcore.xdialnetworks.com/admin-dashboard?campaign_id={obj.pk}"
             return format_html(
                 '<a class="button" href="{}" target="_blank" style="background-color: #417690; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; white-space: nowrap; display: inline-block;">Client Dashboard</a>',
                 dashboard_url
@@ -886,7 +886,11 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
     def get_admin_dashboard_link(self, obj):
         """Display link to admin dashboard (placeholder)"""
         if obj.pk:
-            return mark_safe('<span style="color: #999; padding: 5px 10px; white-space: nowrap; display: inline-block;">Admin Dashboard</span>')
+            dashboard_url = f"https://dashboard.xlitexcore.xdialnetworks.com/admin-dashboard?campaign_id={obj.pk}"
+            return format_html(
+                '<a class="button" href="{}" target="_blank" style="background-color: #417690; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; white-space: nowrap; display: inline-block;">Client Dashboard</a>',
+                dashboard_url
+            )
         return "-"
 
     get_admin_dashboard_link.short_description = 'Admin Dashboard'
