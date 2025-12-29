@@ -37,7 +37,7 @@ class UserAdmin(BaseUserAdmin):
     def has_module_permission(self, request):
         if not request.user.is_authenticated:
             return False
-        return request.user.is_superuser or request.user.is_admin
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
     
     def has_change_permission(self, request, obj=None):
         if not request.user.is_authenticated:
@@ -46,4 +46,15 @@ class UserAdmin(BaseUserAdmin):
             return True
         if request.user.is_admin:
             return True
+        if request.user.is_onboarding:
+            return True
         return False
+    
+    def has_add_permission(self, request):
+        if not request.user.is_authenticated:
+            return False
+        return (
+            request.user.is_superuser or
+            request.user.is_admin or
+            request.user.is_onboarding
+        )
