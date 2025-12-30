@@ -748,19 +748,31 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
     inlines = [ServerCampaignBotsInline]
     readonly_fields = ['get_status_history_display']
     
-    list_display = [
-        'id', 
-        'get_client_name', 
-        'get_campaign', 
-        'get_model',
-        'get_transfer_setting',
-        'get_current_status',
-        'is_active', 
-        'bot_count', 
-        'start_date',
-        'get_client_dashboard_link',
-        'get_admin_dashboard_link',
-    ]
+    def get_list_display(self, request):
+        """Customize list_display based on user role"""
+        base_display = [
+            'id', 
+            'get_client_name', 
+            'get_campaign', 
+            'get_model',
+            'get_transfer_setting',
+            'get_current_status',
+            'is_active', 
+            'bot_count', 
+            'start_date',
+        ]
+        
+        # Superuser and Admin see both dashboards
+        if request.user.is_superuser or request.user.is_admin:
+            return base_display + ['get_client_dashboard_link', 'get_admin_dashboard_link']
+        
+        # QA and Onboarding only see client dashboard
+        if request.user.is_qa or request.user.is_onboarding:
+            return base_display + ['get_client_dashboard_link']
+        
+        # Default (including clients)
+        return base_display + ['get_client_dashboard_link']
+    
     list_filter = [
         CurrentStatusFilter,
         'is_active', 
