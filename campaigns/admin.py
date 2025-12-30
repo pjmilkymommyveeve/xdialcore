@@ -232,30 +232,6 @@ class ModelAdmin(admin.ModelAdmin):
     search_fields = ['name', 'description']
     filter_horizontal = ['transfer_settings']
 
-    def get_list_display(self, request):
-        """Customize list_display based on user role"""
-        base_display = [
-            'id', 
-            'get_client_name', 
-            'get_campaign', 
-            'get_model',
-            'get_transfer_setting',
-            'get_current_status',
-            'is_active', 
-            'bot_count', 
-            'start_date',
-        ]
-        
-        # QA users only see admin dashboard
-        if request.user.is_qa:
-            return base_display + ['get_admin_dashboard_link']
-        
-        # Admin and Onboarding see both dashboards
-        if request.user.is_superuser or request.user.is_admin or request.user.is_onboarding:
-            return base_display + ['get_client_dashboard_link', 'get_admin_dashboard_link']
-        
-        # Others see default
-        return base_display
 
     def get_transfer_settings(self, obj):
         """Display all transfer settings for this model"""
