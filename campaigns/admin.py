@@ -496,12 +496,12 @@ class StatusAdmin(admin.ModelAdmin):
     def has_module_permission(self, request):
         if not request.user.is_authenticated:
             return False
-        return request.user.is_superuser or request.user.is_admin 
+        return request.user.is_superuser 
 
     def has_view_permission(self, request, obj=None):
         if not request.user.is_authenticated:
             return False
-        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding or request.user.is_qa
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding 
 
     def has_add_permission(self, request):
         if not request.user.is_authenticated:

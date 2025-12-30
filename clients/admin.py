@@ -176,7 +176,7 @@ class ClientAdmin(admin.ModelAdmin):
     def has_view_permission(self, request, obj=None):
         if not request.user.is_authenticated:
             return False
-        if request.user.is_superuser or request.user.is_admin or request.user.is_onboarding or request.user.is_qa:
+        if request.user.is_superuser or request.user.is_admin or request.user.is_onboarding:
             return True
         if request.user.is_client and obj:
             return obj.client == request.user
@@ -201,7 +201,7 @@ class ClientAdmin(admin.ModelAdmin):
         qs = super().get_queryset(request)
         if not request.user.is_authenticated:
             return qs.none()
-        if request.user.is_superuser or request.user.is_admin or request.user.is_onboarding or request.user.is_qa:
+        if request.user.is_superuser or request.user.is_admin or request.user.is_onboarding:
             return qs
         if request.user.is_client:
             return qs.filter(client=request.user)
