@@ -195,7 +195,7 @@ class ClientAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         if not request.user.is_authenticated:
             return False
-        return request.user.is_superuser or request.user.is_admin
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
     
     def get_queryset(self, request):
         qs = super().get_queryset(request)
