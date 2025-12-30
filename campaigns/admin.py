@@ -40,6 +40,25 @@ class ServerCampaignBotsInline(admin.TabularInline):
             kwargs["queryset"] = Extension.objects.order_by('extension_number')
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
+    def has_view_permission(self, request, obj=None):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+
+    def has_add_permission(self, request, obj=None):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+
+    def has_change_permission(self, request, obj=None):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+
+    def has_delete_permission(self, request, obj=None):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
 
 class PrimaryDialerInline(admin.TabularInline):
     """Inline for managing Primary Dialers within DialerSettings"""
