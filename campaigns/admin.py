@@ -76,7 +76,7 @@ class PrimaryDialerInline(admin.TabularInline):
     """Inline for managing Primary Dialers within DialerSettings"""
     model = PrimaryDialer
     extra = 1
-    fields = ['admin_link', 'admin_username', 'admin_password', 'fronting_campaign', 'verifier_campaign', 'port']
+    fields = ['ip_validation_link','admin_link', 'admin_username', 'admin_password', 'fronting_campaign', 'verifier_campaign', 'port']
     verbose_name = 'Primary Dialer'
     verbose_name_plural = 'Primary Dialers'
 
