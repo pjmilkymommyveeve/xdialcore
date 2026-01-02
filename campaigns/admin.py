@@ -36,8 +36,20 @@ class ServerCampaignBotsInline(admin.TabularInline):
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "server":
             kwargs["queryset"] = Server.objects.order_by('alias', 'ip')
+            formfield = super().formfield_for_foreignkey(db_field, request, **kwargs)
+            
+            # Customize the label to show IP with alias in brackets
+            def server_label(obj):
+                if obj.alias:
+                    return f"{obj.ip} ({obj.alias})"
+                return obj.ip
+            
+            formfield.label_from_instance = server_label
+            return formfield
+        
         if db_field.name == "extension":
             kwargs["queryset"] = Extension.objects.order_by('extension_number')
+        
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def has_view_permission(self, request, obj=None):
