@@ -642,6 +642,9 @@ class ClientCampaignModelForm(forms.ModelForm):
         # Set transfer settings queryset - show ALL transfer settings with helpful labels
         self.fields['selected_transfer_setting'].queryset = TransferSettings.objects.order_by('display_order', 'name')
         
+        if 'dialer_settings' in self.fields:
+            del self.fields['dialer_settings']
+        
         def transfer_setting_label(ts):
             models_using = ts.models.all()
             if models_using.exists():
