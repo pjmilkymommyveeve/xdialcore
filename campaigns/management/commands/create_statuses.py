@@ -11,6 +11,7 @@ class Command(BaseCommand):
             'Enabled',
             'Disabled',
             'Archived',
+            'Testing'
         ]
         
         for status_name in statuses:

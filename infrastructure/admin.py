@@ -1,7 +1,6 @@
 from django.contrib import admin
 from .models import Server, Extension
 
-
 @admin.register(Server)
 class ServerAdmin(admin.ModelAdmin):
     list_display = ['ip', 'alias', 'domain']
@@ -15,6 +14,16 @@ class ServerAdmin(admin.ModelAdmin):
                 request.user.is_admin or 
                 request.user.is_onboarding)
     
+    def has_view_permission(self, request, obj=None):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+    
+    def has_add_permission(self, request):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+    
     def has_change_permission(self, request, obj=None):
         if not request.user.is_authenticated:
             return False
@@ -24,7 +33,6 @@ class ServerAdmin(admin.ModelAdmin):
         if not request.user.is_authenticated:
             return False
         return request.user.is_superuser or request.user.is_admin
-
 
 @admin.register(Extension)
 class ExtensionAdmin(admin.ModelAdmin):
@@ -37,6 +45,16 @@ class ExtensionAdmin(admin.ModelAdmin):
         return (request.user.is_superuser or 
                 request.user.is_admin or 
                 request.user.is_onboarding)
+    
+    def has_view_permission(self, request, obj=None):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+    
+    def has_add_permission(self, request):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
     
     def has_change_permission(self, request, obj=None):
         if not request.user.is_authenticated:

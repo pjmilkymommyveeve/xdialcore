@@ -68,6 +68,26 @@ class PrimaryDialerInline(admin.TabularInline):
     verbose_name = 'Primary Dialer'
     verbose_name_plural = 'Primary Dialers'
 
+    def has_view_permission(self, request, obj=None):    
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+
+    def has_add_permission(self, request, obj=None):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+
+    def has_change_permission(self, request, obj=None):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+
+    def has_delete_permission(self, request, obj=None):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+
 
 # ============================================================================
 # SECTION 2: CAMPAIGN MODEL WITH INLINE CAMPAIGN AND MODEL MANAGEMENT
@@ -619,17 +639,19 @@ class ClientCampaignModelForm(forms.ModelForm):
         self.fields['campaign_model'].label_from_instance = lambda obj: f"{obj.campaign.name} - {obj.model.name}"
         self.fields['dialer_settings'].queryset = DialerSettings.objects.select_related('closer_dialer').prefetch_related('primary_dialers').order_by('-id')
         
-        if 'campaign_model' in self.data:
-            try:
-                campaign_model_id = int(self.data.get('campaign_model'))
-                campaign_model = CampaignModel.objects.get(id=campaign_model_id)
-                self.fields['selected_transfer_setting'].queryset = campaign_model.model.transfer_settings.all()
-            except (ValueError, TypeError, CampaignModel.DoesNotExist):
-                self.fields['selected_transfer_setting'].queryset = TransferSettings.objects.none()
-        elif self.instance.pk and self.instance.campaign_model:
-            self.fields['selected_transfer_setting'].queryset = self.instance.campaign_model.model.transfer_settings.all()
-        else:
-            self.fields['selected_transfer_setting'].queryset = TransferSettings.objects.none()
+        # Set transfer settings queryset - show ALL transfer settings with helpful labels
+        self.fields['selected_transfer_setting'].queryset = TransferSettings.objects.order_by('display_order', 'name')
+        
+        def transfer_setting_label(ts):
+            models_using = ts.models.all()
+            if models_using.exists():
+                model_names = ", ".join([m.name for m in models_using[:3]])
+                if models_using.count() > 3:
+                    model_names += f" (+{models_using.count() - 3} more)"
+                return f"{ts.name} (Used by: {model_names})"
+            return f"{ts.name} (Not used by any model)"
+        
+        self.fields['selected_transfer_setting'].label_from_instance = transfer_setting_label
 
         # If editing an existing instance
         if self.instance.pk:
@@ -652,8 +674,8 @@ class ClientCampaignModelForm(forms.ModelForm):
                 self.fields['status'].initial = not_approved_status
             except Status.DoesNotExist:
                 pass
-    
         
+        # Set help text
         self.fields['client'].help_text = "Select the client" if not self.instance.pk else "Client cannot be changed after creation"
         self.fields['campaign_model'].help_text = "Select campaign and model combination"
         self.fields['dialer_settings'].help_text = "Select or create dialer settings (use Dialer Settings menu to manage)"
@@ -663,7 +685,6 @@ class ClientCampaignModelForm(forms.ModelForm):
         self.fields['bot_count'].help_text = "Number of bots for this campaign"
         self.fields['long_call_scripts_active'].help_text = "Are long call scripts active?"
         self.fields['disposition_set'].help_text = "Is disposition set configured?"
-
     def clean(self):
         cleaned_data = super().clean()
         start_date = cleaned_data.get('start_date')
