@@ -39,6 +39,11 @@ class UserAdmin(BaseUserAdmin):
             return False
         return request.user.is_superuser or request.user.is_admin 
     
+    def has_add_permission(self, request):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or request.user.is_admin 
+    
     def has_change_permission(self, request, obj=None):
         if not request.user.is_authenticated:
             return False
