@@ -169,39 +169,35 @@ class ClientAdmin(admin.ModelAdmin):
         if not request.user.is_authenticated:
             return False
         return (request.user.is_superuser or 
-                request.user.is_admin or 
-                request.user.is_onboarding or 
-                request.user.is_qa)
+                request.user.is_admin)
     
     def has_view_permission(self, request, obj=None):
         if not request.user.is_authenticated:
             return False
-        if request.user.is_superuser or request.user.is_admin or request.user.is_onboarding:
+        if request.user.is_superuser or request.user.is_admin :
             return True
-        if request.user.is_client and obj:
-            return obj.client == request.user
-        return False
+        
     
     def has_add_permission(self, request):
         if not request.user.is_authenticated:
             return False
-        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+        return request.user.is_superuser or request.user.is_admin 
     
     def has_change_permission(self, request, obj=None):
         if not request.user.is_authenticated:
             return False
-        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+        return request.user.is_superuser or request.user.is_admin 
     
     def has_delete_permission(self, request, obj=None):
         if not request.user.is_authenticated:
             return False
-        return request.user.is_superuser or request.user.is_admin or request.user.is_onboarding
+        return request.user.is_superuser or request.user.is_admin 
     
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if not request.user.is_authenticated:
             return qs.none()
-        if request.user.is_superuser or request.user.is_admin or request.user.is_onboarding:
+        if request.user.is_superuser or request.user.is_admin:
             return qs
         if request.user.is_client:
             return qs.filter(client=request.user)
