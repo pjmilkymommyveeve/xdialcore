@@ -461,8 +461,28 @@ class CloserDialerAdmin(admin.ModelAdmin):
         return request.user.is_superuser or request.user.is_admin
 
 
+class DialerSettingsForm(forms.ModelForm):
+    class Meta:
+        model = DialerSettings
+        fields = '__all__'
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        if self.instance.pk and self.instance.closer_dialer:
+            # For existing instances with closer_dialer, make it readonly and show only their dialer
+            self.fields['closer_dialer'].queryset = CloserDialer.objects.filter(id=self.instance.closer_dialer.id)
+            self.fields['closer_dialer'].disabled = True
+            self.fields['closer_dialer'].help_text = "Closer dialer cannot be changed after creation."
+        else:
+            # For new instances, show all available closer dialers
+            self.fields['closer_dialer'].queryset = CloserDialer.objects.order_by('-id')
+            self.fields['closer_dialer'].help_text = "Select a closer dialer"
+
+
 @admin.register(DialerSettings)
 class DialerSettingsAdmin(admin.ModelAdmin):
+    form = DialerSettingsForm
     inlines = [PrimaryDialerInline]
     list_display = ['id', 'get_primary_dialers_count', 'closer_dialer', 'get_client_campaigns_count']
     list_filter = ['closer_dialer']
@@ -471,7 +491,7 @@ class DialerSettingsAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Dialer Configuration', {
             'fields': ('closer_dialer',),
-            'description': 'Configure the closer dialer for this settings group. Primary dialers are managed below.'
+            'description': 'Configure dialer settings below. Once created, settings are locked to prevent accidental changes. Edit using the inline forms.'
         }),
     )
 
@@ -485,11 +505,6 @@ class DialerSettingsAdmin(admin.ModelAdmin):
         count = obj.client_campaigns.count()
         return f"{count} campaign(s)"
     get_client_campaigns_count.short_description = 'Used By'
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "closer_dialer":
-            kwargs["queryset"] = CloserDialer.objects.order_by('-id')
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def has_module_permission(self, request):
         return False
@@ -649,11 +664,17 @@ class ClientCampaignModelForm(forms.ModelForm):
         self.fields['client'].queryset = Client.objects.select_related('client').order_by('name')
         self.fields['campaign_model'].queryset = CampaignModel.objects.select_related('campaign', 'model').order_by('campaign__name', 'model__name')
         self.fields['campaign_model'].label_from_instance = lambda obj: f"{obj.campaign.name} - {obj.model.name}"
-        self.fields['dialer_settings'].queryset = DialerSettings.objects.select_related('closer_dialer').prefetch_related('primary_dialers').order_by('-id')
         
-        # Set transfer settings queryset - show ALL transfer settings with helpful labels
-        self.fields['selected_transfer_setting'].queryset = TransferSettings.objects.order_by('display_order', 'name')
-        
+        if self.instance.pk and self.instance.dialer_settings:
+            # For existing instances with dialer settings, make it readonly and show only their setting
+            self.fields['dialer_settings'].queryset = DialerSettings.objects.filter(id=self.instance.dialer_settings.id).select_related('closer_dialer').prefetch_related('primary_dialers')
+            self.fields['dialer_settings'].disabled = True
+            self.fields['dialer_settings'].help_text = "Dialer settings cannot be changed after creation. Edit the configuration using the inline form below."
+        else:
+            # For new instances, show all available settings
+            self.fields['dialer_settings'].queryset = DialerSettings.objects.select_related('closer_dialer').prefetch_related('primary_dialers').order_by('-id')
+            self.fields['dialer_settings'].help_text = "Select or create dialer settings (use Dialer Settings menu to manage)"
+
         def transfer_setting_label(ts):
             models_using = ts.models.all()
             if models_using.exists():
@@ -663,7 +684,18 @@ class ClientCampaignModelForm(forms.ModelForm):
                 return f"{ts.name} (Used by: {model_names})"
             return f"{ts.name} (Not used by any model)"
         
+        def dialer_settings_label(ds):
+            # Get all client campaigns using this dialer setting
+            campaigns = ds.client_campaigns.select_related('client').all()
+            if campaigns.exists():
+                client_names = ", ".join([c.client.name for c in campaigns[:3]])
+                if campaigns.count() > 3:
+                    client_names += f" (+{campaigns.count() - 3} more)"
+                return f"{client_names}"
+            return f"Dialer Settings #{ds.id} (Not assigned)"
+        
         self.fields['selected_transfer_setting'].label_from_instance = transfer_setting_label
+        self.fields['dialer_settings'].label_from_instance = dialer_settings_label
 
         # If editing an existing instance
         if self.instance.pk:
@@ -876,6 +908,11 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
                     )
         else:
             super().save_model(request, obj, form, change)
+    def get_dialer_settings_display(self, obj):
+        if obj.dialer_settings:
+            return f"Dialer Settings #{obj.dialer_settings.id} ({obj.client.name})"
+        return '-'
+    get_dialer_settings_display.short_description = 'Dialer Settings'
 
     def get_client_name(self, obj):
         return obj.client.name
