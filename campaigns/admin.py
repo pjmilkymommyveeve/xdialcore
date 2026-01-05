@@ -801,10 +801,10 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
         
         # QA and Onboarding only see client dashboard
         if request.user.is_qa or request.user.is_onboarding:
-            return base_display + ['get_client_dashboard_link']
+            return base_display + ['get_admin_dashboard_link']
         
         # Default (including clients)
-        return base_display + ['get_client_dashboard_link']
+        return base_display + ['get_admin_dashboard_link']
     
     list_filter = [
         CurrentStatusFilter,
