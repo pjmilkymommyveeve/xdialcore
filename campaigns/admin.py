@@ -847,7 +847,6 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
         'start_date',
         'campaign_model__campaign',
         'campaign_model__model',
-        'client',
     ]
     search_fields = [
         'id', 
