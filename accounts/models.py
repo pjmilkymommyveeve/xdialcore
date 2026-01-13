@@ -52,6 +52,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     role = models.ForeignKey(Role, on_delete=models.RESTRICT, related_name='users')
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    plain_password = models.CharField(max_length=255, blank=True, null=True) 
     
     objects = UserManager()
     

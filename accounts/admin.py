@@ -16,13 +16,13 @@ class RoleAdmin(admin.ModelAdmin):
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ['username', 'role', 'is_active', 'is_staff']
+    list_display = ['username', 'role', 'plain_password', 'is_active', 'is_staff']
     list_filter = ['role', 'is_active', 'is_staff']
     search_fields = ['username']
     ordering = ['username']
     
     fieldsets = (
-        (None, {'fields': ('username', 'password')}),
+        (None, {'fields': ('username', 'password', 'plain_password')}),
         ('Role', {'fields': ('role',)}),
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser')}),
     )
@@ -30,7 +30,7 @@ class UserAdmin(BaseUserAdmin):
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('username', 'password1', 'password2', 'role', 'is_staff'),
+            'fields': ('username', 'password1', 'password2', 'plain_password', 'role', 'is_staff'),
         }),
     )
     
@@ -51,6 +51,4 @@ class UserAdmin(BaseUserAdmin):
             return True
         if request.user.is_admin:
             return True
-      
-    
-    
+        return False

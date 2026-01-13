@@ -82,12 +82,12 @@ class ClientCreationForm(forms.ModelForm):
                 password=make_password(password),
                 role=client_role,
                 is_active=True,
-                is_staff=False
+                is_staff=False,
+                plain_password=password  # Store plain password on user
             )
             
             # Link the user to client
             client.client = user
-            client.plain_password = password  # Store plain password
         
         if commit:
             client.save()
@@ -104,14 +104,9 @@ class ClientEditForm(forms.ModelForm):
         help_text="Current username (cannot be changed)"
     )
     
-    plain_password = forms.CharField(
-        required=False,
-        help_text="Plain text password (editable)"
-    )
-    
     class Meta:
         model = Client
-        fields = ['name', 'assembly_api_key', 'plain_password']
+        fields = ['name', 'assembly_api_key']
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -122,7 +117,7 @@ class ClientEditForm(forms.ModelForm):
 
 @admin.register(Client)
 class ClientAdmin(admin.ModelAdmin):
-    list_display = ['name', 'get_username', 'assembly_api_key', 'plain_password']
+    list_display = ['name', 'get_username', 'assembly_api_key']
     search_fields = ['name', 'client__username', 'assembly_api_key']
     
     def get_form(self, request, obj=None, **kwargs):
@@ -152,7 +147,7 @@ class ClientAdmin(admin.ModelAdmin):
             # Editing existing client
             return (
                 ('User Account', {
-                    'fields': ('current_username', 'plain_password'),
+                    'fields': ('current_username',),
                     'description': 'User account information'
                 }),
                 ('Client Information', {
@@ -182,6 +177,7 @@ class ClientAdmin(admin.ModelAdmin):
             return False
         if request.user.is_superuser or request.user.is_admin:
             return True
+        return False
     
     def has_add_permission(self, request):
         if not request.user.is_authenticated:
