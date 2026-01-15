@@ -802,7 +802,42 @@ class CurrentStatusFilter(admin.SimpleListFilter):
             
             return queryset.filter(id__in=campaign_ids)
         return queryset
-    
+
+class ActiveStatusFilter(admin.SimpleListFilter):
+    title = 'activity status'
+    parameter_name = 'activity_status'
+
+    def lookups(self, request, model_admin):
+        """Return list of activity statuses to filter by"""
+        return [
+            ('active', 'Active (calls in last minute)'),
+            ('inactive', 'Inactive (no recent calls)'),
+        ]
+
+    def queryset(self, request, queryset):
+        """Filter queryset based on activity status"""
+        if self.value() == 'active':
+            # Get campaigns with calls in the last minute
+            one_minute_ago = timezone.now() - timedelta(minutes=1)
+            from calls.models import Call
+            active_campaign_ids = Call.objects.filter(
+                timestamp__gte=one_minute_ago
+            ).values_list('client_campaign_model_id', flat=True).distinct()
+            
+            return queryset.filter(id__in=active_campaign_ids)
+        
+        elif self.value() == 'inactive':
+            # Get campaigns WITHOUT calls in the last minute
+            one_minute_ago = timezone.now() - timedelta(minutes=1)
+            from calls.models import Call
+            active_campaign_ids = Call.objects.filter(
+                timestamp__gte=one_minute_ago
+            ).values_list('client_campaign_model_id', flat=True).distinct()
+            
+            return queryset.exclude(id__in=active_campaign_ids)
+        
+        return queryset
+
 @admin.register(ClientCampaignModel)
 class ClientCampaignModelAdmin(admin.ModelAdmin):
     form = ClientCampaignModelForm
@@ -857,6 +892,7 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
     
     list_filter = [
         CurrentStatusFilter,
+        ActiveStatusFilter,
         'is_custom', 
         'long_call_scripts_active', 
         'disposition_set', 
