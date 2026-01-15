@@ -725,7 +725,6 @@ class ClientCampaignModelForm(forms.ModelForm):
         self.fields['campaign_model'].help_text = "Select campaign and model combination"
         self.fields['dialer_settings'].help_text = "Select or create dialer settings (use Dialer Settings menu to manage)"
         self.fields['selected_transfer_setting'].help_text = "Select transfer setting from available options for this model"
-        self.fields['is_active'].help_text = "Is this campaign currently running?"
         self.fields['is_custom'].help_text = "Check if this is a custom configuration"
         self.fields['bot_count'].help_text = "Number of bots for this campaign"
         self.fields['long_call_scripts_active'].help_text = "Are long call scripts active?"
@@ -734,16 +733,12 @@ class ClientCampaignModelForm(forms.ModelForm):
         cleaned_data = super().clean()
         start_date = cleaned_data.get('start_date')
         end_date = cleaned_data.get('end_date')
-        is_active = cleaned_data.get('is_active')
         campaign_model = cleaned_data.get('campaign_model')
         selected_transfer_setting = cleaned_data.get('selected_transfer_setting')
 
         if end_date and start_date and end_date < start_date:
             raise forms.ValidationError({'end_date': "End date cannot be before start date"})
-
-        if is_active and end_date:
-            raise forms.ValidationError({'is_active': "Cannot be active if campaign has ended (end date is set)"})
-
+        
         # Validate transfer setting belongs to the model
         if campaign_model and selected_transfer_setting:
             if not campaign_model.model.transfer_settings.filter(id=selected_transfer_setting.id).exists():
@@ -862,7 +857,6 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
     
     list_filter = [
         CurrentStatusFilter,
-        'is_active', 
         'is_custom', 
         'long_call_scripts_active', 
         'disposition_set', 
@@ -886,7 +880,7 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
             'fields': ('client', 'campaign_model', 'selected_transfer_setting', 'start_date', 'end_date')
         }),
         ('Status', {
-            'fields': ('status', 'is_active', 'get_status_history_display')
+            'fields': ('status', 'get_status_history_display')
         }),
         ('Campaign Configuration', {
             'fields': ('bot_count', 'long_call_scripts_active', 'disposition_set'),

@@ -261,7 +261,6 @@ class ClientCampaignModel(models.Model):
     is_custom = models.BooleanField(default=False)
     custom_comments = models.TextField(blank=True, null=True)
     current_remote_agents = models.TextField(blank=True, null=True)
-    is_active = models.BooleanField(default=False)
     # Dialer configuration
     dialer_settings = models.ForeignKey(
         DialerSettings,
@@ -274,10 +273,22 @@ class ClientCampaignModel(models.Model):
     long_call_scripts_active = models.BooleanField(default=False, help_text="Are long call scripts active?")
     disposition_set = models.BooleanField(default=False, help_text="Is disposition set configured?")
     
+    
     def current_status_history(self):
         """Get the current (active) status history entry"""
         return self.status_history.filter(end_date__isnull=True).first()
     
+    @property
+    def is_active(self):
+        """
+        Calculate if campaign is active based on recent calls.
+        A campaign is considered active if it has had calls in the last minute.
+        """
+        from django.utils import timezone
+        from datetime import timedelta
+        one_minute_ago = timezone.now() - timedelta(minutes=1)
+        return self.calls.filter(timestamp__gte=one_minute_ago).exists()
+
     @property
     def current_status(self):
         """Get the current status"""
@@ -291,7 +302,6 @@ class ClientCampaignModel(models.Model):
         indexes = [
             models.Index(fields=['client'], name='idx_ccm_client'),
             models.Index(fields=['campaign_model'], name='idx_ccm_camp_model'),
-            models.Index(fields=['is_active'], name='idx_ccm_active'),
             models.Index(fields=['start_date'], name='idx_ccm_start'),
             models.Index(fields=['end_date'], name='idx_ccm_end'),
             models.Index(fields=['bot_count'], name='idx_ccm_bot_count'),
