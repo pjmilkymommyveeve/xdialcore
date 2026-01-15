@@ -1,3 +1,4 @@
+from datetime import timedelta
 from django.contrib import admin
 from django import forms
 from django.utils import timezone
@@ -822,7 +823,7 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
             'get_model',
             'get_transfer_setting',
             'get_current_status',
-            'is_active', 
+            'get_is_active_status',  
             'bot_count', 
             'start_date',
         ]
@@ -837,6 +838,27 @@ class ClientCampaignModelAdmin(admin.ModelAdmin):
         
         # Default (including clients)
         return base_display + ['get_admin_dashboard_link']
+    
+    def get_is_active_status(self, obj):
+        """Check if campaign had calls in the last minute"""
+        one_minute_ago = timezone.now() - timedelta(minutes=1)
+        has_recent_calls = obj.calls.filter(timestamp__gte=one_minute_ago).exists()
+        
+        if has_recent_calls:
+            return format_html(
+                '<span style="color: {}; font-weight: bold;">●</span> {}',
+                '#28a745',
+                'Active'
+            )
+        else:
+            return format_html(
+                '<span style="color: {}; font-weight: bold;">●</span> {}',
+                '#dc3545',
+                'Inactive'
+            )
+    
+    get_is_active_status.short_description = 'Activity Status'
+       
     
     list_filter = [
         CurrentStatusFilter,
